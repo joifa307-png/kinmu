@@ -8,7 +8,7 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:24px;-webkit-text-size-adjust:100%}
-body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;background:#eae5e3;color:#37322f;min-height:100vh;line-height:1.5}
+body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;background:#9999cc;color:#37322f;min-height:100vh;line-height:1.5}
 .app{max-width:480px;margin:0 auto;padding:12px 14px 32px}
 .card{background:#FCFBFA;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(55,50,47,.06)}
 .name-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(55,50,47,.08)}
@@ -23,16 +23,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku
 .shift-toggle{border:2px solid #d8d2ce;border-radius:10px;padding:12px 8px;text-align:center;font-size:.9rem;font-weight:600;background:#fff;color:#37322f;cursor:pointer;transition:all .15s}
 .shift-toggle.active{border-color:#0f6e56;background:#dcefe2;color:#0f6e56}
 .dial-wrap{margin-top:4px}
+.dial-wrap.dials-hidden .dial-wheels{display:none}
 .dial-wrap.dials-locked .dial-row,.dial-wrap.dials-locked .dial-col,.dial-wrap.dials-locked .wheel-outer{touch-action:pan-y}
 .dial-wrap.dials-locked .wheel-outer{opacity:.55}
 .dial-wrap.dials-locked .wheel{overflow:hidden;pointer-events:none;touch-action:pan-y}
-.dial-wrap.dials-editing{border:2px solid #0f6e56;border-radius:12px;padding:10px 8px 8px;background:#f8fcf9}
-.dial-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.dial-header .range{font-size:.95rem;font-weight:600}
-.dial-header .preset{font-size:.8rem;color:#6b6562}
-.btn-dial-edit{display:block;width:100%;margin-bottom:10px;padding:12px 16px;border:2px solid #0f6e56;border-radius:10px;background:#fff;color:#0f6e56;font-size:.9rem;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s,color .15s}
-.btn-dial-edit.editing{background:#0f6e56;color:#fff}
+.dial-wrap.dials-editing .dial-wheels{border:2px solid #0f6e56;border-radius:12px;padding:8px 4px 4px;background:#f8fcf9;margin-top:8px}
+.dial-header{display:flex;align-items:center;gap:8px;margin-top:10px}
+.dial-header .range{flex:1;font-size:.9rem;font-weight:600;min-width:0}
+.btn-dial-edit{flex:0 0 auto;min-width:4.2em;border:2px solid #d8d2ce;border-radius:10px;padding:12px 8px;text-align:center;font-size:.9rem;font-weight:600;background:#fff;color:#37322f;cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-dial-edit.editing{border-color:#0f6e56;background:#0f6e56;color:#fff}
 .btn-dial-edit:disabled{opacity:.4;cursor:default}
+.dial-wheels{margin-top:0}
 .dial-row{display:flex;align-items:center;justify-content:center;gap:4px}
 .dial-col{flex:1;max-width:72px}
 .dial-label{text-align:center;font-size:.7rem;color:#6b6562;margin-bottom:4px}
@@ -100,12 +101,12 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
     <div class="section-label">シフト</div>
     <div class="shift-toggles" id="shiftToggles"></div>
 
-    <div class="dial-wrap dials-locked" id="dialWrap">
+    <div class="dial-wrap dials-locked dials-hidden" id="dialWrap">
       <div class="dial-header">
         <span class="range" id="dialRange"></span>
-        <span class="preset" id="dialPreset"></span>
+        <button type="button" id="btnDialEdit" class="btn-dial-edit">変更</button>
       </div>
-      <button type="button" id="btnDialEdit" class="btn-dial-edit">変更</button>
+      <div class="dial-wheels" id="dialWheels">
       <div class="dial-row">
         <div class="dial-col">
           <div class="dial-label">開始 時</div>
@@ -124,6 +125,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
           <div class="dial-label">終了 分</div>
           <div class="wheel-outer"><div class="wheel-highlight"></div><div class="wheel" id="wmEnd"></div></div>
         </div>
+      </div>
       </div>
     </div>
   </div>
@@ -361,6 +363,7 @@ let wheelsMounted = false;
 let saving = false;
 let loadedRecord = null;
 let dialsLocked = true;
+let dialsVisible = false;
 
 const $ = id => document.getElementById(id);
 
@@ -485,21 +488,28 @@ function syncWheels() {
   wheelCtrls.wmEnd.snapTo(ep.m);
 }
 
+function hideDials() {
+  dialsVisible = false;
+  dialsLocked = true;
+  applyDialLockUI();
+}
+
 function lockDials() {
   dialsLocked = true;
   applyDialLockUI();
 }
 
-function unlockDials() {
-  if (status !== 'work') return;
-  dialsLocked = false;
-  applyDialLockUI();
-}
-
 function toggleDialEdit() {
   if (status !== 'work') return;
-  if (dialsLocked) unlockDials();
-  else lockDials();
+  if (dialsLocked) {
+    dialsVisible = true;
+    dialsLocked = false;
+    applyDialLockUI();
+    if (!wheelsMounted) mountDials();
+    else requestAnimationFrame(() => requestAnimationFrame(() => syncWheels()));
+  } else {
+    lockDials();
+  }
 }
 
 function applyDialLockUI() {
@@ -507,10 +517,11 @@ function applyDialLockUI() {
   const btn = $('btnDialEdit');
   if (!wrap || !btn) return;
   const locked = status !== 'work' || dialsLocked;
+  wrap.classList.toggle('dials-hidden', !dialsVisible || status !== 'work');
   wrap.classList.toggle('dials-locked', locked);
-  wrap.classList.toggle('dials-editing', status === 'work' && !dialsLocked);
-  btn.textContent = (status === 'work' && !dialsLocked) ? '確定' : '変更';
-  btn.classList.toggle('editing', status === 'work' && !dialsLocked);
+  wrap.classList.toggle('dials-editing', status === 'work' && dialsVisible && !dialsLocked);
+  btn.textContent = (status === 'work' && dialsVisible && !dialsLocked) ? '確定' : '変更';
+  btn.classList.toggle('editing', status === 'work' && dialsVisible && !dialsLocked);
   btn.disabled = status !== 'work';
 }
 
@@ -534,7 +545,7 @@ function selShift(i) {
   startMin = shift.start;
   endMin = shift.end;
   breakMin = shift.breakMin;
-  lockDials();
+  hideDials();
   buildToggles();
   render();
   mountDials();
@@ -553,7 +564,7 @@ function tog(key) {
 function setMode(m) {
   status = m;
   if (m !== 'absence') { absenceReason = null; absenceNote = ''; }
-  if (m !== 'work') lockDials();
+  if (m !== 'work') hideDials();
   render();
 }
 
@@ -594,7 +605,6 @@ function render() {
   const val = getValidation();
 
   $('dialRange').textContent = `${fmtTime(startMin)} 〜 ${fmtTime(endMin)}`;
-  $('dialPreset').textContent = shift ? `所定${fmtHours(shift.workMin)}` : '';
 
   const banner = $('banner');
   const bannerMain = $('bannerMain');
@@ -674,6 +684,7 @@ function applyRecord(rec) {
   buildToggles();
   render();
   mountDials();
+  hideDials();
 }
 
 function applyDraft(d) {
@@ -694,6 +705,7 @@ function applyDraft(d) {
   buildToggles();
   render();
   mountDials();
+  hideDials();
 }
 
 function resetForm() {
@@ -722,6 +734,7 @@ function resetForm() {
   buildToggles();
   render();
   mountDials();
+  hideDials();
 }
 
 function buildRecord() {
@@ -882,6 +895,7 @@ async function submitRecord() {
   if (result.ok) {
     try { localStorage.removeItem(draftKey()); } catch (_) { /* ignore */ }
     if (result.record) applyRecord(result.record);
+    else hideDials();
     showBriefToast(result.local ? 'ローカルに保存しました' : '登録しました');
   } else {
     $('warnMsg').textContent = result.error || '保存に失敗しました';
@@ -960,7 +974,7 @@ function bootApp(staffDef, displayName) {
   $('memo').addEventListener('input', () => { memo = $('memo').value; render(); });
   $('btnSubmit').addEventListener('click', submitRecord);
   $('btnDialEdit').addEventListener('click', toggleDialEdit);
-  lockDials();
+  hideDials();
 }
 
 async function getWoffProfile() {
