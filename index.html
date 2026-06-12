@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>出勤簿</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;background:#eae5e3;color:#37322f;min-height:100vh;line-height:1.5}
+.app{max-width:480px;margin:0 auto;padding:12px 14px 32px}
+.card{background:#FCFBFA;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(55,50,47,.06)}
+.name-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(55,50,47,.08)}
+.name-card .staff-name{font-size:1.25rem;font-weight:700;margin-bottom:4px}
+.name-card .staff-meta{font-size:.85rem;color:#6b6562;margin-bottom:12px}
+.date-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:10px;border-top:1px solid #ece8e5}
+.date-nav button{background:none;border:none;font-size:1.4rem;color:#0f6e56;padding:4px 12px;cursor:pointer;line-height:1}
+.date-nav button:disabled{opacity:.3;cursor:default}
+.date-nav .date-label{font-size:.95rem;font-weight:600;flex:1;text-align:center}
+.section-label{font-size:.8rem;font-weight:600;color:#6b6562;margin-bottom:8px;letter-spacing:.02em}
+.shift-toggles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.shift-toggle{border:2px solid #d8d2ce;border-radius:10px;padding:12px 8px;text-align:center;font-size:.9rem;font-weight:600;background:#fff;color:#37322f;cursor:pointer;transition:all .15s}
+.shift-toggle.active{border-color:#0f6e56;background:#dcefe2;color:#0f6e56}
+.dial-wrap{margin-top:4px}
+.dial-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.dial-header .range{font-size:.95rem;font-weight:600}
+.dial-header .preset{font-size:.8rem;color:#6b6562}
+.dial-row{display:flex;align-items:center;justify-content:center;gap:4px}
+.dial-col{flex:1;max-width:72px}
+.dial-label{text-align:center;font-size:.7rem;color:#6b6562;margin-bottom:4px}
+.wheel-outer{position:relative;height:140px;overflow:hidden;border-radius:10px;background:#fff;border:1px solid #e8e4e1}
+.wheel-outer::before,.wheel-outer::after{content:"";position:absolute;left:0;right:0;height:40px;z-index:2;pointer-events:none}
+.wheel-outer::before{top:0;background:linear-gradient(to bottom,#fff 30%,rgba(255,255,255,0))}
+.wheel-outer::after{bottom:0;background:linear-gradient(to top,#fff 30%,rgba(255,255,255,0))}
+.wheel-highlight{position:absolute;top:50%;left:2px;right:2px;height:44px;margin-top:-22px;background:#dcefe2;border:1px solid rgba(15,110,86,.25);border-radius:8px;z-index:0;pointer-events:none}
+.wheel{position:relative;z-index:1;height:100%;overflow-y:auto;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;background:transparent}
+.wheel::-webkit-scrollbar{display:none}
+.wheel-item{height:44px;display:flex;align-items:center;justify-content:center;font-size:1.05rem;font-weight:600;scroll-snap-align:center;color:#b5aea8;flex-shrink:0;line-height:44px}
+.wheel-item.sel{color:#0f6e56;font-size:1.25rem;font-weight:700}
+.wheel-item.wheel-pad{visibility:hidden;pointer-events:none}
+.dial-sep{font-size:1.2rem;font-weight:700;padding-top:18px;color:#6b6562}
+.banner{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-radius:12px;margin-bottom:12px;font-weight:600}
+.banner.work{background:#dcefe2;color:#0f6e56}
+.banner.holiday{background:#faeeda;color:#854f0b}
+.banner.paid{background:#e6f1fb;color:#185fa5}
+.banner.abs{background:#fcebeb;color:#a32d2d}
+.banner .banner-main{font-size:1.05rem}
+.banner .banner-sub{font-size:.85rem;opacity:.85}
+.chip-row{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:2px solid #d8d2ce;border-radius:20px;padding:8px 16px;font-size:.85rem;font-weight:600;background:#fff;cursor:pointer;transition:all .15s}
+.chip.active.late{border-color:#0f6e56;background:#dcefe2;color:#0f6e56}
+.chip.active.hol{border-color:#854f0b;background:#faeeda;color:#854f0b}
+.chip.active.sick,.chip.active.other{border-color:#a32d2d;background:#fcebeb;color:#a32d2d}
+.seg-row{display:flex;border-radius:10px;overflow:hidden;border:2px solid #d8d2ce}
+.seg{flex:1;padding:11px 4px;text-align:center;font-size:.82rem;font-weight:600;background:#fff;cursor:pointer;border:none;color:#37322f;transition:all .15s}
+.seg+.seg{border-left:2px solid #d8d2ce}
+.seg.active.work{background:#dcefe2;color:#0f6e56}
+.seg.active.paid{background:#e6f1fb;color:#185fa5}
+.seg.active.abs{background:#fcebeb;color:#a32d2d}
+.dimmed{opacity:.45;pointer-events:none;user-select:none}
+textarea{width:100%;border:1px solid #d8d2ce;border-radius:10px;padding:12px;font-size:.9rem;font-family:inherit;resize:vertical;min-height:72px;background:#fff;color:#37322f}
+textarea:focus{outline:2px solid #0f6e56;outline-offset:0}
+input[type=text]{width:100%;border:1px solid #d8d2ce;border-radius:10px;padding:10px 12px;font-size:.9rem;font-family:inherit;background:#fff;color:#37322f;margin-top:8px}
+input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
+.reason-block{margin-top:10px}
+.warn{color:#a32d2d;font-size:14px;text-align:center;margin:12px 0 8px;min-height:20px}
+.btn-submit{width:100%;padding:16px;border:none;border-radius:12px;background:#2a2522;color:#fff;font-size:1rem;font-weight:700;cursor:pointer;transition:opacity .15s}
+.btn-submit:disabled{opacity:.4;cursor:default}
+.not-reg{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:24px}
+.not-reg h2{font-size:1.1rem;margin-bottom:12px;color:#a32d2d}
+.not-reg p{font-size:.9rem;color:#6b6562;line-height:1.7}
+.dev-badge{position:fixed;top:6px;right:6px;background:#854f0b;color:#fff;font-size:.65rem;padding:3px 8px;border-radius:6px;opacity:.85;z-index:99}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2a2522;color:#fff;padding:10px 20px;border-radius:20px;font-size:.85rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="devBadge" class="dev-badge" style="display:none">ローカル開発</div>
+<div id="app" class="app" style="display:none">
+  <div class="name-card">
+    <div class="staff-name" id="staffName"></div>
+    <div class="staff-meta" id="staffMeta"></div>
+    <div class="date-nav">
+      <button type="button" id="btnPrev" aria-label="前日">&#8249;</button>
+      <div class="date-label" id="dateLabel"></div>
+      <button type="button" id="btnNext" aria-label="翌日">&#8250;</button>
+    </div>
+  </div>
+
+  <div class="card" id="workArea">
+    <div class="section-label">シフト</div>
+    <div class="shift-toggles" id="shiftToggles"></div>
+
+    <div class="dial-wrap" id="dialWrap">
+      <div class="dial-header">
+        <span class="range" id="dialRange"></span>
+        <span class="preset" id="dialPreset"></span>
+      </div>
+      <div class="dial-row">
+        <div class="dial-col">
+          <div class="dial-label">開始 時</div>
+          <div class="wheel-outer"><div class="wheel-highlight"></div><div class="wheel" id="whStart"></div></div>
+        </div>
+        <div class="dial-col">
+          <div class="dial-label">開始 分</div>
+          <div class="wheel-outer"><div class="wheel-highlight"></div><div class="wheel" id="wmStart"></div></div>
+        </div>
+        <div class="dial-sep">〜</div>
+        <div class="dial-col">
+          <div class="dial-label">終了 時</div>
+          <div class="wheel-outer"><div class="wheel-highlight"></div><div class="wheel" id="whEnd"></div></div>
+        </div>
+        <div class="dial-col">
+          <div class="dial-label">終了 分</div>
+          <div class="wheel-outer"><div class="wheel-highlight"></div><div class="wheel" id="wmEnd"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="banner work" id="banner">
+    <span class="banner-main" id="bannerMain">実働 0.0H</span>
+    <span class="banner-sub" id="bannerSub">残業 0.0H</span>
+  </div>
+
+  <div class="card">
+    <div class="section-label">状態</div>
+    <div class="chip-row">
+      <button type="button" class="chip" id="chipLate" data-key="late">遅刻・早退</button>
+      <button type="button" class="chip" id="chipHol" data-key="hol">休日出勤</button>
+    </div>
+    <div class="reason-block" id="lateReasonBlock" style="display:none">
+      <input type="text" id="lateNote" placeholder="遅刻・早退の理由（任意）" maxlength="200">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-label">区分</div>
+    <div class="seg-row" id="segRow">
+      <button type="button" class="seg active work" data-mode="work">通常勤務</button>
+      <button type="button" class="seg" data-mode="paid_leave">有給</button>
+      <button type="button" class="seg" data-mode="absence">欠勤</button>
+    </div>
+    <div class="reason-block" id="absReasonBlock" style="display:none;margin-top:12px">
+      <div class="chip-row">
+        <button type="button" class="chip" id="chipSick" data-reason="sick">病欠</button>
+        <button type="button" class="chip" id="chipOther" data-reason="other">その他</button>
+      </div>
+      <input type="text" id="absenceNote" placeholder="欠勤理由（その他の場合は必須）" maxlength="200" style="display:none">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-label">特記事項</div>
+    <textarea id="memo" placeholder="自由記入" maxlength="500"></textarea>
+  </div>
+
+  <div class="warn" id="warnMsg"></div>
+  <button type="button" class="btn-submit" id="btnSubmit">登録する</button>
+</div>
+
+<div id="notReg" class="not-reg" style="display:none">
+  <h2>未登録の社員です</h2>
+  <p>出勤簿に登録されていません。<br>本部にお問い合わせください。</p>
+  <p id="notRegId" style="margin-top:16px;font-size:.8rem"></p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ── 定数 ── */
+const WOFF_ID = 'YOUR_WOFF_ID_HERE';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
+const MINUTES = [0, 10, 20, 30, 40, 50];
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const FACILITY_LABELS = { nishi: 'おひさま西', minami: '南のおひさま', hibari: 'ヘルパーステーションひばり・居宅ひばり', link: '有限会社リンク' };
+const JOB_LABELS = { kaigo: '介護職員', chori: '調理スタッフ', helper: 'ヘルパー（正）', caremane: 'ケアマネージャー', jimu: '事務スタッフ' };
+
+/* ── マスタ ── */
+const shiftMaster = {
+  nishi_kaigo_nikkin:  { shiftKey: 'nishi_kaigo_nikkin',  facilityId: 'nishi',  jobType: 'kaigo',    label: '日勤',  start: 510,  end: 1050, breakMin: 60,  workMin: 480, order: 1, active: true },
+  nishi_kaigo_hankin:  { shiftKey: 'nishi_kaigo_hankin',  facilityId: 'nishi',  jobType: 'kaigo',    label: '半勤',  start: 510,  end: 750,  breakMin: 0,   workMin: 240, order: 2, active: true },
+  nishi_kaigo_chiban:  { shiftKey: 'nishi_kaigo_chiban',  facilityId: 'nishi',  jobType: 'kaigo',    label: '遅番',  start: 570,  end: 1110, breakMin: 60,  workMin: 480, order: 3, active: true },
+  nishi_kaigo_yakin:   { shiftKey: 'nishi_kaigo_yakin',   facilityId: 'nishi',  jobType: 'kaigo',    label: '夜勤',  start: 1050, end: 510,  breakMin: 120, workMin: 780, order: 4, active: true },
+  nishi_chori_a:       { shiftKey: 'nishi_chori_a',       facilityId: 'nishi',  jobType: 'chori',    label: '調理A', start: 390,  end: 720,  breakMin: 0,   workMin: 330, order: 1, active: true },
+  nishi_chori_b:       { shiftKey: 'nishi_chori_b',       facilityId: 'nishi',  jobType: 'chori',    label: '調理B', start: 720,  end: 1110, breakMin: 45,  workMin: 345, order: 2, active: true },
+  minami_kaigo_nikkin: { shiftKey: 'minami_kaigo_nikkin', facilityId: 'minami', jobType: 'kaigo',    label: '日勤',  start: 510,  end: 1050, breakMin: 60,  workMin: 480, order: 1, active: true },
+  minami_kaigo_hankin: { shiftKey: 'minami_kaigo_hankin', facilityId: 'minami', jobType: 'kaigo',    label: '半勤',  start: 510,  end: 750,  breakMin: 0,   workMin: 240, order: 2, active: true },
+  minami_kaigo_chiban: { shiftKey: 'minami_kaigo_chiban', facilityId: 'minami', jobType: 'kaigo',    label: '遅番',  start: 540,  end: 1080, breakMin: 60,  workMin: 480, order: 3, active: true },
+  minami_kaigo_yakin:  { shiftKey: 'minami_kaigo_yakin',  facilityId: 'minami', jobType: 'kaigo',    label: '夜勤',  start: 1050, end: 540,  breakMin: 120, workMin: 810, order: 4, active: true },
+  minami_chori_a:      { shiftKey: 'minami_chori_a',      facilityId: 'minami', jobType: 'chori',    label: '調理A', start: 390,  end: 810,  breakMin: 60,  workMin: 360, order: 1, active: true },
+  minami_chori_b:      { shiftKey: 'minami_chori_b',      facilityId: 'minami', jobType: 'chori',    label: '調理B', start: 810,  end: 1110, breakMin: 0,   workMin: 300, order: 2, active: true },
+  hibari_helper_normal:{ shiftKey: 'hibari_helper_normal',facilityId: 'hibari', jobType: 'helper',   label: '通常',  start: 510,  end: 1050, breakMin: 60,  workMin: 480, order: 1, active: true },
+  hibari_caremane_normal:{ shiftKey:'hibari_caremane_normal',facilityId:'hibari',jobType:'caremane',label:'通常',  start: 510,  end: 1050, breakMin: 60,  workMin: 480, order: 1, active: true },
+  link_jimu_somu:      { shiftKey: 'link_jimu_somu',      facilityId: 'link',   jobType: 'jimu',     label: '総務',  start: 510,  end: 1050, breakMin: 60,  workMin: 480, order: 1, active: true },
+  link_jimu_part:      { shiftKey: 'link_jimu_part',      facilityId: 'link',   jobType: 'jimu',     label: 'パート',start: 510,  end: 900,  breakMin: 60,  workMin: 330, order: 2, active: true }
+};
+
+const statusMaster = {
+  work:       { statusKey: 'work',       label: '通常勤務', hasTime: true,  countsOvertime: true },
+  paid_leave: { statusKey: 'paid_leave', label: '有給',     hasTime: false, countsOvertime: false },
+  absence:    { statusKey: 'absence',    label: '欠勤',     hasTime: false, countsOvertime: false }
+};
+
+const staffMaster = {
+  'dev-staff-001': {
+    staffId: 'dev-staff-001', name: '山田 太郎', facilityId: 'nishi', jobType: 'kaigo',
+    workType: 'A', defaultShiftKey: 'nishi_kaigo_nikkin', role: 'staff', active: true
+  },
+  'dev-staff-002': {
+    staffId: 'dev-staff-002', name: '佐藤 花子', facilityId: 'minami', jobType: 'kaigo',
+    workType: 'B', defaultShiftKey: 'minami_kaigo_nikkin', role: 'staff', active: true
+  },
+  'dev-staff-003': {
+    staffId: 'dev-staff-003', name: '鈴木 一郎', facilityId: 'link', jobType: 'jimu',
+    workType: '総務', defaultShiftKey: 'link_jimu_somu', role: 'staff', active: true
+  }
+};
+
+/* ── 計算（純関数） ── */
+function spanMin(start, end) {
+  let s = end - start;
+  if (s <= 0) s += 1440;
+  return s;
+}
+function computeWorkMin(start, end, breakMin) {
+  return spanMin(start, end) - breakMin;
+}
+function computeActualWork(start, end, breakMin) {
+  return spanMin(start, end) - breakMin;
+}
+function computeOvertime(actualWorkMin, shiftWorkMin) {
+  return Math.max(0, actualWorkMin - shiftWorkMin);
+}
+function isShortWork(actualWorkMin, shiftWorkMin) {
+  return actualWorkMin < shiftWorkMin;
+}
+function fmtTime(min) {
+  return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+}
+function fmtHours(min) {
+  return (min / 60).toFixed(1) + 'H';
+}
+
+/* ── ユーティリティ ── */
+function isEmpty(v) {
+  if (v === null || v === undefined) return true;
+  if (typeof v === 'string' && v.trim() === '') return true;
+  if (Array.isArray(v) && v.length === 0) return true;
+  if (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0) return true;
+  return false;
+}
+
+function todayStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function addDays(dateStr, delta) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + delta);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
+function fmtReiwa(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const reiwaYear = y - 2018;
+  return `令和${reiwaYear}年${m}月${d}日`;
+}
+
+function recordKey(date, staffId) {
+  return `${date}_${staffId}`;
+}
+
+function shiftKeysForStaff(staffId) {
+  const staff = staffMaster[staffId];
+  if (!staff) return [];
+  return Object.values(shiftMaster)
+    .filter(s => s.active && s.facilityId === staff.facilityId && s.jobType === staff.jobType)
+    .sort((a, b) => a.order - b.order)
+    .map(s => s.shiftKey);
+}
+
+function isBackdated(record) {
+  if (!record || !record.date || !record.createdAt) return false;
+  return record.date !== record.createdAt.slice(0, 10);
+}
+
+function nearestMinute(m) {
+  const idx = MINUTES.reduce((best, v, i) =>
+    Math.abs(v - m) < Math.abs(MINUTES[best] - m) ? i : best, 0);
+  return MINUTES[idx];
+}
+
+function minToParts(min) {
+  return { h: Math.floor(min / 60) % 24, m: nearestMinute(min % 60) };
+}
+
+function partsToMin(h, m) {
+  return h * 60 + m;
+}
+
+/* ── mergeDb（フィールド単位マージ） ── */
+function mergeRecord(base, incoming) {
+  if (!base) return incoming ? JSON.parse(JSON.stringify(incoming)) : null;
+  if (!incoming) return JSON.parse(JSON.stringify(base));
+  const out = JSON.parse(JSON.stringify(base));
+  Object.keys(incoming).forEach(k => {
+    const v = incoming[k];
+    if (!isEmpty(v)) out[k] = v;
+  });
+  return out;
+}
+
+function mergeDb(local, remote) {
+  const result = { records: {} };
+  const keys = new Set([
+    ...Object.keys((local && local.records) || {}),
+    ...Object.keys((remote && remote.records) || {})
+  ]);
+  keys.forEach(k => {
+    result.records[k] = mergeRecord(
+      local && local.records && local.records[k],
+      remote && remote.records && remote.records[k]
+    );
+  });
+  return result;
+}
+
+/* ── アプリ状態 ── */
+let staff = null;
+let currentDate = todayStr();
+let SHIFTS = [];
+let selShiftIdx = 0;
+let startMin = 510;
+let endMin = 1050;
+let breakMin = 60;
+let status = 'work';
+let lateFlag = false;
+let lateNote = '';
+let holidayWorkFlag = false;
+let absenceReason = null;
+let absenceNote = '';
+let memo = '';
+let wheelsMounted = false;
+let isDevMode = false;
+let saving = false;
+let loadedRecord = null;
+
+const $ = id => document.getElementById(id);
+
+function gasConfigured() {
+  return !!(GAS_URL && !GAS_URL.includes('YOUR_DEPLOYMENT_ID'));
+}
+
+function showToast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function showBriefToast(msg) {
+  showToast(msg);
+}
+
+/* ── ホイール ── */
+const WHEEL_ITEM_H = 44;
+
+function fillWheel(el, vals, cur, cb) {
+  el.innerHTML = '';
+  const topPad = document.createElement('div');
+  topPad.className = 'wheel-item wheel-pad';
+  topPad.textContent = '00';
+  el.appendChild(topPad);
+  vals.forEach(v => {
+    const item = document.createElement('div');
+    item.className = 'wheel-item';
+    item.dataset.val = v;
+    item.textContent = String(v).padStart(2, '0');
+    el.appendChild(item);
+  });
+  const bottomPad = topPad.cloneNode(true);
+  el.appendChild(bottomPad);
+
+  let scrollTimer = null;
+  let programmatic = false;
+
+  function indexForVal(val) {
+    const idx = vals.indexOf(Number(val));
+    return idx >= 0 ? idx : 0;
+  }
+
+  function scrollTopForIndex(idx) {
+    return Math.max(0, (idx + 1) * WHEEL_ITEM_H - (el.clientHeight - WHEEL_ITEM_H) / 2);
+  }
+
+  function indexAtCenter() {
+    const center = el.scrollTop + el.clientHeight / 2;
+    const idx = Math.round((center - WHEEL_ITEM_H / 2) / WHEEL_ITEM_H) - 1;
+    return Math.max(0, Math.min(vals.length - 1, idx));
+  }
+
+  function updateHighlight() {
+    const idx = indexAtCenter();
+    el.querySelectorAll('.wheel-item[data-val]').forEach((item, i) => {
+      item.classList.toggle('sel', i === idx);
+    });
+    return vals[idx];
+  }
+
+  function snapTo(val) {
+    programmatic = true;
+    el.scrollTop = scrollTopForIndex(indexForVal(val));
+    updateHighlight();
+    requestAnimationFrame(() => { programmatic = false; });
+  }
+
+  function onScrollEnd() {
+    const idx = indexAtCenter();
+    el.scrollTop = scrollTopForIndex(idx);
+    const val = updateHighlight();
+    if (val !== undefined) cb(val);
+  }
+
+  el.addEventListener('scroll', () => {
+    updateHighlight();
+    if (programmatic) return;
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(onScrollEnd, 120);
+  }, { passive: true });
+
+  return { snapTo };
+}
+
+let wheelCtrls = {};
+
+function mountDials() {
+  const sp = minToParts(startMin);
+  const ep = minToParts(endMin);
+  wheelCtrls.whStart = fillWheel($('whStart'), HOURS, sp.h, h => {
+    startMin = partsToMin(h, minToParts(startMin).m);
+    render();
+  });
+  wheelCtrls.wmStart = fillWheel($('wmStart'), MINUTES, sp.m, m => {
+    startMin = partsToMin(minToParts(startMin).h, m);
+    render();
+  });
+  wheelCtrls.whEnd = fillWheel($('whEnd'), HOURS, ep.h, h => {
+    endMin = partsToMin(h, minToParts(endMin).m);
+    render();
+  });
+  wheelCtrls.wmEnd = fillWheel($('wmEnd'), MINUTES, ep.m, m => {
+    endMin = partsToMin(minToParts(endMin).h, m);
+    render();
+  });
+  wheelsMounted = true;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => syncWheels());
+  });
+}
+
+function syncWheels() {
+  if (!wheelsMounted) return;
+  const sp = minToParts(startMin);
+  const ep = minToParts(endMin);
+  wheelCtrls.whStart.snapTo(sp.h);
+  wheelCtrls.wmStart.snapTo(sp.m);
+  wheelCtrls.whEnd.snapTo(ep.h);
+  wheelCtrls.wmEnd.snapTo(ep.m);
+}
+
+/* ── UI構築 ── */
+function buildToggles() {
+  const container = $('shiftToggles');
+  container.innerHTML = '';
+  SHIFTS.forEach((shift, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'shift-toggle' + (i === selShiftIdx ? ' active' : '');
+    btn.textContent = shift.label;
+    btn.addEventListener('click', () => selShift(i));
+    container.appendChild(btn);
+  });
+}
+
+function selShift(i) {
+  selShiftIdx = i;
+  const shift = SHIFTS[i];
+  startMin = shift.start;
+  endMin = shift.end;
+  breakMin = shift.breakMin;
+  buildToggles();
+  mountDials();
+  render();
+}
+
+function tog(key) {
+  if (key === 'late') {
+    lateFlag = !lateFlag;
+    if (!lateFlag) lateNote = '';
+  } else if (key === 'hol') {
+    holidayWorkFlag = !holidayWorkFlag;
+  }
+  render();
+}
+
+function setMode(m) {
+  status = m;
+  if (m !== 'absence') { absenceReason = null; absenceNote = ''; }
+  render();
+}
+
+function setAbs(r) {
+  absenceReason = r;
+  if (r !== 'other') absenceNote = '';
+  render();
+}
+
+function calc() {
+  const shift = SHIFTS[selShiftIdx];
+  const shiftWorkMin = shift ? shift.workMin : 0;
+  const work = computeActualWork(startMin, endMin, breakMin);
+  const ot = computeOvertime(work, shiftWorkMin);
+  const short = isShortWork(work, shiftWorkMin);
+  return { work, ot, short, shiftWorkMin };
+}
+
+function getValidation() {
+  const { short, shiftWorkMin } = calc();
+  if (status === 'work' && short && !lateFlag) {
+    return { ok: false, msg: `所定（${fmtHours(shiftWorkMin)}）より短い勤務です。「遅刻・早退」を選んでください。` };
+  }
+  if (status === 'absence' && !absenceReason) {
+    return { ok: false, msg: '欠勤の理由（病欠／その他）を選んでください。' };
+  }
+  if (absenceReason === 'other' && isEmpty(absenceNote)) {
+    return { ok: false, msg: '「その他」の欠勤理由を入力してください。' };
+  }
+  return { ok: true, msg: '' };
+}
+
+function render() {
+  if (!staff) return;
+
+  const shift = SHIFTS[selShiftIdx];
+  const { work, ot } = calc();
+  const val = getValidation();
+
+  $('dialRange').textContent = `${fmtTime(startMin)} 〜 ${fmtTime(endMin)}`;
+  $('dialPreset').textContent = shift ? `所定${fmtHours(shift.workMin)}` : '';
+
+  const banner = $('banner');
+  const bannerMain = $('bannerMain');
+  const bannerSub = $('bannerSub');
+  banner.className = 'banner';
+  bannerSub.style.display = '';
+
+  if (status === 'paid_leave') {
+    banner.classList.add('paid');
+    bannerMain.textContent = '有給';
+    bannerSub.style.display = 'none';
+  } else if (status === 'absence') {
+    banner.classList.add('abs');
+    bannerMain.textContent = '欠勤';
+    bannerSub.style.display = 'none';
+  } else {
+    banner.classList.add(holidayWorkFlag ? 'holiday' : 'work');
+    bannerMain.textContent = `実働 ${fmtHours(work)}`;
+    bannerSub.textContent = `残業 ${fmtHours(ot)}`;
+  }
+
+  $('workArea').classList.toggle('dimmed', status !== 'work');
+
+  $('chipLate').classList.toggle('active', lateFlag);
+  $('chipLate').classList.toggle('late', lateFlag);
+  $('chipHol').classList.toggle('active', holidayWorkFlag);
+  $('chipHol').classList.toggle('hol', holidayWorkFlag);
+  $('lateReasonBlock').style.display = lateFlag ? 'block' : 'none';
+
+  document.querySelectorAll('#segRow .seg').forEach(btn => {
+    const m = btn.dataset.mode;
+    btn.classList.toggle('active', status === m);
+    btn.classList.toggle(m === 'work' ? 'work' : m === 'paid_leave' ? 'paid' : 'abs', status === m);
+  });
+
+  $('absReasonBlock').style.display = status === 'absence' ? 'block' : 'none';
+  $('chipSick').classList.toggle('active', absenceReason === 'sick');
+  $('chipSick').classList.toggle('sick', absenceReason === 'sick');
+  $('chipOther').classList.toggle('active', absenceReason === 'other');
+  $('chipOther').classList.toggle('other', absenceReason === 'other');
+  $('absenceNote').style.display = absenceReason === 'other' ? 'block' : 'none';
+
+  $('warnMsg').textContent = val.msg;
+  $('btnSubmit').disabled = !val.ok || saving;
+
+  saveDraft();
+}
+
+function applyRecord(rec) {
+  if (!rec) {
+    loadedRecord = null;
+    resetForm();
+    return;
+  }
+  loadedRecord = rec;
+  status = rec.status || 'work';
+  lateFlag = !!rec.lateFlag;
+  lateNote = rec.lateNote || '';
+  holidayWorkFlag = !!rec.holidayWorkFlag;
+  absenceReason = rec.absenceReason || null;
+  absenceNote = rec.absenceNote || '';
+  memo = rec.memo || '';
+
+  if (rec.shiftKey) {
+    const idx = SHIFTS.findIndex(s => s.shiftKey === rec.shiftKey);
+    if (idx >= 0) selShiftIdx = idx;
+  }
+  if (rec.start != null) startMin = Number(rec.start);
+  if (rec.end != null) endMin = Number(rec.end);
+  if (rec.breakMin != null) breakMin = Number(rec.breakMin);
+
+  $('lateNote').value = lateNote;
+  $('absenceNote').value = absenceNote;
+  $('memo').value = memo;
+
+  buildToggles();
+  mountDials();
+  render();
+}
+
+function applyDraft(d) {
+  status = d.status || 'work';
+  selShiftIdx = d.selShiftIdx != null ? d.selShiftIdx : selShiftIdx;
+  startMin = d.startMin != null ? d.startMin : startMin;
+  endMin = d.endMin != null ? d.endMin : endMin;
+  breakMin = d.breakMin != null ? d.breakMin : breakMin;
+  lateFlag = !!d.lateFlag;
+  lateNote = d.lateNote || '';
+  holidayWorkFlag = !!d.holidayWorkFlag;
+  absenceReason = d.absenceReason || null;
+  absenceNote = d.absenceNote || '';
+  memo = d.memo || '';
+  $('lateNote').value = lateNote;
+  $('absenceNote').value = absenceNote;
+  $('memo').value = memo;
+  buildToggles();
+  mountDials();
+  render();
+}
+
+function resetForm() {
+  loadedRecord = null;
+  status = 'work';
+  lateFlag = false;
+  lateNote = '';
+  holidayWorkFlag = false;
+  absenceReason = null;
+  absenceNote = '';
+  memo = '';
+  $('lateNote').value = '';
+  $('absenceNote').value = '';
+  $('memo').value = '';
+
+  const defKey = staff.defaultShiftKey;
+  const idx = SHIFTS.findIndex(s => s.shiftKey === defKey);
+  selShiftIdx = idx >= 0 ? idx : 0;
+  const shift = SHIFTS[selShiftIdx];
+  startMin = shift.start;
+  endMin = shift.end;
+  breakMin = shift.breakMin;
+
+  buildToggles();
+  mountDials();
+  render();
+}
+
+function buildRecord() {
+  const shift = SHIFTS[selShiftIdx];
+  const { work, ot } = calc();
+  const now = new Date().toISOString();
+
+  return {
+    date: currentDate,
+    staffId: staff.staffId,
+    status,
+    shiftKey: status === 'work' ? shift.shiftKey : (loadedRecord && loadedRecord.shiftKey) || shift.shiftKey,
+    start: startMin,
+    end: endMin,
+    breakMin,
+    workMin: status === 'work' ? work : 0,
+    overtimeMin: status === 'work' ? ot : 0,
+    lateFlag,
+    lateNote: lateNote.trim(),
+    holidayWorkFlag,
+    absenceReason: status === 'absence' ? absenceReason : null,
+    absenceNote: absenceNote.trim(),
+    memo: memo.trim(),
+    createdBy: staff.staffId,
+    createdAt: (loadedRecord && loadedRecord.createdAt) || now,
+    updatedAt: now
+  };
+}
+
+/* ── localStorage（下書き・キャッシュ） ── */
+function draftKey() {
+  return `kinmu_draft_${staff.staffId}_${currentDate}`;
+}
+
+function saveDraft() {
+  if (!staff) return;
+  lateNote = $('lateNote').value;
+  absenceNote = $('absenceNote').value;
+  memo = $('memo').value;
+  try {
+    localStorage.setItem(draftKey(), JSON.stringify({
+      status, selShiftIdx, startMin, endMin, breakMin,
+      lateFlag, lateNote, holidayWorkFlag,
+      absenceReason, absenceNote, memo
+    }));
+  } catch (_) { /* ignore */ }
+}
+
+function loadDraftRecord(date) {
+  const d = date || currentDate;
+  try {
+    const raw = localStorage.getItem(`kinmu_record_${recordKey(d, staff.staffId)}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) { return null; }
+}
+
+function cacheRecord(rec) {
+  try {
+    localStorage.setItem(`kinmu_record_${recordKey(rec.date, rec.staffId)}`, JSON.stringify(rec));
+  } catch (_) { /* ignore */ }
+}
+
+/* ── GAS 同期 ── */
+async function fetchStaffFromGas(staffId) {
+  if (!gasConfigured()) return null;
+  try {
+    const url = `${GAS_URL}?type=staffOne&staffId=${encodeURIComponent(staffId)}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.ok) return null;
+    return data.staff || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function fetchRecordFromGas(date, staffId) {
+  if (!gasConfigured()) return null;
+  try {
+    const url = `${GAS_URL}?type=record&date=${encodeURIComponent(date)}&staffId=${encodeURIComponent(staffId)}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.ok) return null;
+    return data.record || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function saveRecordToGas(record) {
+  if (!gasConfigured()) {
+    cacheRecord(record);
+    return { ok: true, local: true, record };
+  }
+  try {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(record)
+    });
+    const data = await res.json();
+    if (data.ok) {
+      const saved = data.record || record;
+      cacheRecord(saved);
+      return { ok: true, record: saved };
+    }
+    return { ok: false, error: data.error || '保存に失敗しました' };
+  } catch (e) {
+    return { ok: false, error: e.message || '通信エラー' };
+  }
+}
+
+async function loadRecordForDate(date) {
+  if (gasConfigured()) {
+    const rec = await fetchRecordFromGas(date, staff.staffId);
+    if (rec) {
+      cacheRecord(rec);
+      applyRecord(rec);
+      return;
+    }
+    resetForm();
+    return;
+  }
+
+  const cached = loadDraftRecord(date);
+  if (cached) {
+    applyRecord(cached);
+    return;
+  }
+  try {
+    const draftRaw = localStorage.getItem(`kinmu_draft_${staff.staffId}_${date}`);
+    if (draftRaw) {
+      applyDraft(JSON.parse(draftRaw));
+      return;
+    }
+  } catch (_) { /* ignore */ }
+  resetForm();
+}
+
+async function submitRecord() {
+  const val = getValidation();
+  if (!val.ok || saving) return;
+
+  lateNote = $('lateNote').value;
+  absenceNote = $('absenceNote').value;
+  memo = $('memo').value;
+
+  saving = true;
+  $('warnMsg').textContent = '';
+  render();
+
+  const record = buildRecord();
+  const result = await saveRecordToGas(record);
+
+  saving = false;
+  if (result.ok) {
+    try { localStorage.removeItem(draftKey()); } catch (_) { /* ignore */ }
+    if (result.record) applyRecord(result.record);
+    showBriefToast(result.local ? 'ローカルに保存しました' : '登録しました');
+  } else {
+    $('warnMsg').textContent = result.error || '保存に失敗しました';
+    showBriefToast(result.error || '保存に失敗しました');
+  }
+  render();
+}
+
+/* ── 日付ナビ ── */
+function updateDateNav() {
+  $('dateLabel').textContent = fmtReiwa(currentDate);
+  const today = todayStr();
+  $('btnNext').disabled = currentDate >= today;
+}
+
+async function changeDate(delta) {
+  const next = addDays(currentDate, delta);
+  if (next > todayStr()) return;
+  saveDraft();
+  currentDate = next;
+  updateDateNav();
+  await loadRecordForDate(currentDate);
+}
+
+/* ── ブート ── */
+function showNotRegistered(profile) {
+  $('notReg').style.display = 'flex';
+  $('notRegId').textContent = profile ? `ID: ${profile.userId || ''}` : '';
+}
+
+function bootApp(staffDef, displayName) {
+  staff = staffDef;
+  const keys = shiftKeysForStaff(staff.staffId);
+  SHIFTS = keys.map(k => shiftMaster[k]);
+
+  $('staffName').textContent = staff.name || displayName || '';
+  const fac = FACILITY_LABELS[staff.facilityId] || staff.facilityId;
+  const job = JOB_LABELS[staff.jobType] || staff.jobType;
+  $('staffMeta').textContent = `${staff.workType ? staff.workType + '　' : ''}${fac}　${job}`;
+
+  $('app').style.display = 'block';
+  currentDate = todayStr();
+  updateDateNav();
+
+  buildToggles();
+  loadRecordForDate(currentDate);
+
+  $('btnPrev').addEventListener('click', () => changeDate(-1));
+  $('btnNext').addEventListener('click', () => changeDate(1));
+  $('chipLate').addEventListener('click', () => tog('late'));
+  $('chipHol').addEventListener('click', () => tog('hol'));
+  $('chipSick').addEventListener('click', () => setAbs('sick'));
+  $('chipOther').addEventListener('click', () => setAbs('other'));
+  document.querySelectorAll('#segRow .seg').forEach(btn => {
+    btn.addEventListener('click', () => setMode(btn.dataset.mode));
+  });
+  $('lateNote').addEventListener('input', () => { lateNote = $('lateNote').value; render(); });
+  $('absenceNote').addEventListener('input', () => { absenceNote = $('absenceNote').value; render(); });
+  $('memo').addEventListener('input', () => { memo = $('memo').value; render(); });
+  $('btnSubmit').addEventListener('click', submitRecord);
+}
+
+async function initWoff() {
+  if (typeof woff !== 'undefined' && woff.init) {
+    try {
+      await woff.init({ woffId: WOFF_ID });
+      const profile = await woff.getProfile();
+      const s = gasConfigured()
+        ? await fetchStaffFromGas(profile.userId)
+        : staffMaster[profile.userId];
+      if (!s || s.active === false) { showNotRegistered(profile); return; }
+      bootApp(s, profile.displayName);
+      return;
+    } catch (e) {
+      console.warn('WOFF init failed, falling back to dev mode', e);
+    }
+  }
+
+  isDevMode = true;
+  $('devBadge').style.display = 'block';
+  const firstKey = Object.keys(staffMaster)[0];
+  const devStaff = staffMaster[firstKey];
+  bootApp(devStaff);
+}
+
+document.addEventListener('DOMContentLoaded', initWoff);
+</script>
+</body>
+</html>
