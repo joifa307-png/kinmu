@@ -23,9 +23,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku
 .shift-toggle{border:2px solid #d8d2ce;border-radius:10px;padding:12px 8px;text-align:center;font-size:.9rem;font-weight:600;background:#fff;color:#37322f;cursor:pointer;transition:all .15s}
 .shift-toggle.active{border-color:#0f6e56;background:#dcefe2;color:#0f6e56}
 .dial-wrap{margin-top:4px}
+.dial-wrap.dials-locked .dial-row,.dial-wrap.dials-locked .dial-col,.dial-wrap.dials-locked .wheel-outer{touch-action:pan-y}
+.dial-wrap.dials-locked .wheel-outer{opacity:.55}
+.dial-wrap.dials-locked .wheel{overflow:hidden;pointer-events:none;touch-action:pan-y}
+.dial-wrap.dials-editing{border:2px solid #0f6e56;border-radius:12px;padding:10px 8px 8px;background:#f8fcf9}
 .dial-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .dial-header .range{font-size:.95rem;font-weight:600}
 .dial-header .preset{font-size:.8rem;color:#6b6562}
+.btn-dial-edit{display:block;width:100%;margin-bottom:10px;padding:12px 16px;border:2px solid #0f6e56;border-radius:10px;background:#fff;color:#0f6e56;font-size:.9rem;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s,color .15s}
+.btn-dial-edit.editing{background:#0f6e56;color:#fff}
+.btn-dial-edit:disabled{opacity:.4;cursor:default}
 .dial-row{display:flex;align-items:center;justify-content:center;gap:4px}
 .dial-col{flex:1;max-width:72px}
 .dial-label{text-align:center;font-size:.7rem;color:#6b6562;margin-bottom:4px}
@@ -93,11 +100,12 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
     <div class="section-label">シフト</div>
     <div class="shift-toggles" id="shiftToggles"></div>
 
-    <div class="dial-wrap" id="dialWrap">
+    <div class="dial-wrap dials-locked" id="dialWrap">
       <div class="dial-header">
         <span class="range" id="dialRange"></span>
         <span class="preset" id="dialPreset"></span>
       </div>
+      <button type="button" id="btnDialEdit" class="btn-dial-edit">変更</button>
       <div class="dial-row">
         <div class="dial-col">
           <div class="dial-label">開始 時</div>
@@ -352,6 +360,7 @@ let memo = '';
 let wheelsMounted = false;
 let saving = false;
 let loadedRecord = null;
+let dialsLocked = true;
 
 const $ = id => document.getElementById(id);
 
@@ -476,6 +485,35 @@ function syncWheels() {
   wheelCtrls.wmEnd.snapTo(ep.m);
 }
 
+function lockDials() {
+  dialsLocked = true;
+  applyDialLockUI();
+}
+
+function unlockDials() {
+  if (status !== 'work') return;
+  dialsLocked = false;
+  applyDialLockUI();
+}
+
+function toggleDialEdit() {
+  if (status !== 'work') return;
+  if (dialsLocked) unlockDials();
+  else lockDials();
+}
+
+function applyDialLockUI() {
+  const wrap = $('dialWrap');
+  const btn = $('btnDialEdit');
+  if (!wrap || !btn) return;
+  const locked = status !== 'work' || dialsLocked;
+  wrap.classList.toggle('dials-locked', locked);
+  wrap.classList.toggle('dials-editing', status === 'work' && !dialsLocked);
+  btn.textContent = (status === 'work' && !dialsLocked) ? '確定' : '変更';
+  btn.classList.toggle('editing', status === 'work' && !dialsLocked);
+  btn.disabled = status !== 'work';
+}
+
 /* ── UI構築 ── */
 function buildToggles() {
   const container = $('shiftToggles');
@@ -496,6 +534,7 @@ function selShift(i) {
   startMin = shift.start;
   endMin = shift.end;
   breakMin = shift.breakMin;
+  lockDials();
   buildToggles();
   render();
   mountDials();
@@ -514,6 +553,7 @@ function tog(key) {
 function setMode(m) {
   status = m;
   if (m !== 'absence') { absenceReason = null; absenceNote = ''; }
+  if (m !== 'work') lockDials();
   render();
 }
 
@@ -600,6 +640,7 @@ function render() {
   $('warnMsg').textContent = val.msg;
   $('btnSubmit').disabled = !val.ok || saving;
 
+  applyDialLockUI();
   saveDraft();
 }
 
@@ -918,6 +959,8 @@ function bootApp(staffDef, displayName) {
   $('absenceNote').addEventListener('input', () => { absenceNote = $('absenceNote').value; render(); });
   $('memo').addEventListener('input', () => { memo = $('memo').value; render(); });
   $('btnSubmit').addEventListener('click', submitRecord);
+  $('btnDialEdit').addEventListener('click', toggleDialEdit);
+  lockDials();
 }
 
 async function getWoffProfile() {
