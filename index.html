@@ -279,13 +279,13 @@ function recordKey(date, staffId) {
   return `${date}_${staffId}`;
 }
 
-function shiftKeysForStaff(staffId) {
-  const staff = staffMaster[staffId];
-  if (!staff) return [];
+function shiftKeysForStaff(staffRef) {
+  const s = typeof staffRef === 'string' ? staffMaster[staffRef] : staffRef;
+  if (!s || !s.facilityId || !s.jobType) return [];
   return Object.values(shiftMaster)
-    .filter(s => s.active && s.facilityId === staff.facilityId && s.jobType === staff.jobType)
+    .filter(sh => sh.active && sh.facilityId === s.facilityId && sh.jobType === s.jobType)
     .sort((a, b) => a.order - b.order)
-    .map(s => s.shiftKey);
+    .map(sh => sh.shiftKey);
 }
 
 function isBackdated(record) {
@@ -497,8 +497,8 @@ function selShift(i) {
   endMin = shift.end;
   breakMin = shift.breakMin;
   buildToggles();
-  mountDials();
   render();
+  mountDials();
 }
 
 function tog(key) {
@@ -631,8 +631,8 @@ function applyRecord(rec) {
   $('memo').value = memo;
 
   buildToggles();
-  mountDials();
   render();
+  mountDials();
 }
 
 function applyDraft(d) {
@@ -651,8 +651,8 @@ function applyDraft(d) {
   $('absenceNote').value = absenceNote;
   $('memo').value = memo;
   buildToggles();
-  mountDials();
   render();
+  mountDials();
 }
 
 function resetForm() {
@@ -668,6 +668,8 @@ function resetForm() {
   $('absenceNote').value = '';
   $('memo').value = '';
 
+  if (!SHIFTS.length) return;
+
   const defKey = staff.defaultShiftKey;
   const idx = SHIFTS.findIndex(s => s.shiftKey === defKey);
   selShiftIdx = idx >= 0 ? idx : 0;
@@ -677,8 +679,8 @@ function resetForm() {
   breakMin = shift.breakMin;
 
   buildToggles();
-  mountDials();
   render();
+  mountDials();
 }
 
 function buildRecord() {
@@ -874,8 +876,10 @@ function showNotRegistered(profile) {
 
 function bootApp(staffDef, displayName) {
   staff = staffDef;
-  const keys = shiftKeysForStaff(staff.staffId);
-  SHIFTS = keys.map(k => shiftMaster[k]);
+  const keys = shiftKeysForStaff(staff);
+  SHIFTS = keys.map(k => shiftMaster[k]).filter(Boolean);
+  // ※本番前に削除可
+  console.log('SHIFTS', SHIFTS);
 
   $('staffName').textContent = staff.name || displayName || '';
   const fac = FACILITY_LABELS[staff.facilityId] || staff.facilityId;
@@ -886,7 +890,19 @@ function bootApp(staffDef, displayName) {
   currentDate = todayStr();
   updateDateNav();
 
+  if (SHIFTS.length) {
+    const defKey = staff.defaultShiftKey;
+    const idx = SHIFTS.findIndex(s => s.shiftKey === defKey);
+    selShiftIdx = idx >= 0 ? idx : 0;
+    const shift = SHIFTS[selShiftIdx];
+    startMin = shift.start;
+    endMin = shift.end;
+    breakMin = shift.breakMin;
+  }
+
   buildToggles();
+  render();
+  mountDials();
   loadRecordForDate(currentDate);
 
   $('btnPrev').addEventListener('click', () => changeDate(-1));
