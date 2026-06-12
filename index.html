@@ -4,10 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>出勤簿</title>
+<script charset="utf-8" src="https://static.worksmobile.net/static/wm/woff/edge/3.7.1/sdk.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:24px;-webkit-text-size-adjust:100%}
-body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;background:#eae5e3;color:#37322f;min-height:100vh;line-height:1.5}
+body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;background:#44617b;color:#37322f;min-height:100vh;line-height:1.5}
 .app{max-width:480px;margin:0 auto;padding:12px 14px 32px}
 .card{background:#FCFBFA;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(55,50,47,.06)}
 .name-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(55,50,47,.08)}
@@ -69,13 +70,11 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 .not-reg{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:24px}
 .not-reg h2{font-size:1.1rem;margin-bottom:12px;color:#a32d2d}
 .not-reg p{font-size:.9rem;color:#6b6562;line-height:1.7}
-.dev-badge{position:fixed;top:6px;right:6px;background:#854f0b;color:#fff;font-size:.65rem;padding:3px 8px;border-radius:6px;opacity:.85;z-index:99}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2a2522;color:#fff;padding:10px 20px;border-radius:20px;font-size:.85rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100}
 .toast.show{opacity:1}
 </style>
 </head>
 <body>
-<div id="devBadge" class="dev-badge" style="display:none">ローカル開発</div>
 <div id="app" class="app" style="display:none">
   <div class="name-card">
     <div class="staff-name" id="staffName"></div>
@@ -160,8 +159,8 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 </div>
 
 <div id="notReg" class="not-reg" style="display:none">
-  <h2>未登録の社員です</h2>
-  <p>出勤簿に登録されていません。<br>本部にお問い合わせください。</p>
+  <h2>登録されていません</h2>
+  <p>管理者にご連絡ください。</p>
   <p id="notRegId" style="margin-top:16px;font-size:.8rem"></p>
 </div>
 
@@ -169,7 +168,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const WOFF_ID = 'YOUR_WOFF_ID_HERE';
+const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -346,7 +345,6 @@ let absenceReason = null;
 let absenceNote = '';
 let memo = '';
 let wheelsMounted = false;
-let isDevMode = false;
 let saving = false;
 let loadedRecord = null;
 
@@ -862,8 +860,9 @@ async function changeDate(delta) {
 
 /* ── ブート ── */
 function showNotRegistered(profile) {
+  $('app').style.display = 'none';
   $('notReg').style.display = 'flex';
-  $('notRegId').textContent = profile ? `ID: ${profile.userId || ''}` : '';
+  $('notRegId').textContent = profile && profile.userId ? `ID: ${profile.userId}` : '';
 }
 
 function bootApp(staffDef, displayName) {
@@ -898,30 +897,49 @@ function bootApp(staffDef, displayName) {
   $('btnSubmit').addEventListener('click', submitRecord);
 }
 
-async function initWoff() {
-  if (typeof woff !== 'undefined' && woff.init) {
-    try {
-      await woff.init({ woffId: WOFF_ID });
-      const profile = await woff.getProfile();
-      const s = gasConfigured()
-        ? await fetchStaffFromGas(profile.userId)
-        : staffMaster[profile.userId];
-      if (!s || s.active === false) { showNotRegistered(profile); return; }
-      bootApp(s, profile.displayName);
-      return;
-    } catch (e) {
-      console.warn('WOFF init failed, falling back to dev mode', e);
+async function getWoffProfile() {
+  try {
+    return await woff.getProfile();
+  } catch (e) {
+    if (typeof woff.login === 'function') {
+      await woff.login();
+      return null;
     }
+    throw e;
   }
-
-  isDevMode = true;
-  $('devBadge').style.display = 'block';
-  const firstKey = Object.keys(staffMaster)[0];
-  const devStaff = staffMaster[firstKey];
-  bootApp(devStaff);
 }
 
-document.addEventListener('DOMContentLoaded', initWoff);
+window.addEventListener('load', async () => {
+  if (typeof woff === 'undefined') {
+    bootApp(staffMaster['dev-staff-001']);
+    return;
+  }
+
+  try {
+    await woff.init({ woffId: WOFF_ID });
+    const profile = await getWoffProfile();
+    if (!profile) return;
+
+    const userId = profile.userId;
+    // ※本番前に削除可
+    console.log('WOFF userId:', userId);
+
+    const s = await fetchStaffFromGas(userId);
+    if (!s || s.active === false) {
+      showNotRegistered(profile);
+      return;
+    }
+
+    const staffData = {
+      ...s,
+      name: (staffMaster[userId] && staffMaster[userId].name) || s.name
+    };
+    bootApp(staffData, profile.displayName);
+  } catch (e) {
+    console.error('WOFF init failed:', e);
+    showNotRegistered({ userId: '' });
+  }
+});
 </script>
 </body>
 </html>
