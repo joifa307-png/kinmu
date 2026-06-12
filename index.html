@@ -8,7 +8,7 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:24px;-webkit-text-size-adjust:100%}
-body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;background:#44617b;color:#37322f;min-height:100vh;line-height:1.5}
+body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;background:#eae5e3;color:#37322f;min-height:100vh;line-height:1.5}
 .app{max-width:480px;margin:0 auto;padding:12px 14px 32px}
 .card{background:#FCFBFA;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(55,50,47,.06)}
 .name-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(55,50,47,.08)}
@@ -67,9 +67,12 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 .warn{color:#a32d2d;font-size:21px;text-align:center;margin:12px 0 8px;min-height:20px}
 .btn-submit{width:100%;padding:16px;border:none;border-radius:12px;background:#2a2522;color:#fff;font-size:1rem;font-weight:700;cursor:pointer;transition:opacity .15s}
 .btn-submit:disabled{opacity:.4;cursor:default}
-.not-reg{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:24px}
-.not-reg h2{font-size:1.1rem;margin-bottom:12px;color:#a32d2d}
-.not-reg p{font-size:.9rem;color:#6b6562;line-height:1.7}
+.not-reg{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;padding:24px 16px}
+.not-reg-card{background:#fff;border-radius:14px;padding:24px 20px;max-width:400px;width:100%;box-shadow:0 1px 3px rgba(55,50,47,.08);text-align:center}
+.not-reg-msg{font-size:.95rem;color:#37322f;line-height:1.75;margin-bottom:20px}
+.not-reg-id-label{font-size:.85rem;color:#6b6562;margin-bottom:8px;text-align:left}
+.not-reg-id{width:100%;font-size:1.15rem;font-weight:700;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:14px 12px;border:2px solid #d8d2ce;border-radius:10px;background:#FCFBFA;color:#0f6e56;text-align:center;-webkit-user-select:all;user-select:all;cursor:text}
+.not-reg-id:focus{outline:2px solid #0f6e56;outline-offset:0}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2a2522;color:#fff;padding:10px 20px;border-radius:20px;font-size:.85rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100}
 .toast.show{opacity:1}
 </style>
@@ -159,9 +162,11 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 </div>
 
 <div id="notReg" class="not-reg" style="display:none">
-  <h2>登録されていません</h2>
-  <p>管理者にご連絡ください。</p>
-  <p id="notRegId" style="margin-top:16px;font-size:.8rem"></p>
+  <div class="not-reg-card">
+    <p class="not-reg-msg">登録されていません。下記のIDを管理者にお伝えください。</p>
+    <p class="not-reg-id-label">あなたのID：</p>
+    <input type="text" id="notRegId" class="not-reg-id" readonly>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -862,7 +867,9 @@ async function changeDate(delta) {
 function showNotRegistered(profile) {
   $('app').style.display = 'none';
   $('notReg').style.display = 'flex';
-  $('notRegId').textContent = profile && profile.userId ? `ID: ${profile.userId}` : '';
+  const idEl = $('notRegId');
+  idEl.value = (profile && profile.userId) ? profile.userId : '';
+  idEl.onclick = function () { this.focus(); this.select(); };
 }
 
 function bootApp(staffDef, displayName) {
