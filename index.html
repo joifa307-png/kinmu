@@ -84,6 +84,12 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 .not-reg-id-label{font-size:.85rem;color:#6b6562;margin-bottom:8px;text-align:left}
 .not-reg-id{width:100%;font-size:1.15rem;font-weight:700;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:14px 12px;border:2px solid #d8d2ce;border-radius:10px;background:#FCFBFA;color:#0f6e56;text-align:center;-webkit-user-select:all;user-select:all;cursor:text}
 .not-reg-id:focus{outline:2px solid #0f6e56;outline-offset:0}
+.not-reg-name{font-size:1.05rem;font-weight:700;color:#37322f;text-align:left;margin-bottom:14px}
+.not-reg-send{width:100%;margin-top:16px;padding:16px;border:none;border-radius:12px;background:#0f6e56;color:#fff;font-size:1rem;font-weight:700;cursor:pointer;font-family:inherit}
+.not-reg-send:active{opacity:.85}
+.not-reg-copy{width:100%;margin-top:10px;padding:13px;border:2px solid #d8d2ce;border-radius:10px;background:#fff;color:#37322f;font-size:.95rem;font-weight:600;cursor:pointer;font-family:inherit}
+.not-reg-status{font-size:.85rem;line-height:1.6;margin-top:14px;min-height:1.4em;text-align:center;color:#0f6e56}
+.not-reg-status.err{color:#ce5242}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2a2522;color:#fff;padding:10px 20px;border-radius:20px;font-size:.85rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100}
 .toast.show{opacity:1}
 .cal-overlay{position:fixed;inset:0;background:rgba(55,50,47,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
@@ -242,9 +248,14 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <div id="notReg" class="not-reg" style="display:none">
   <div class="not-reg-card">
-    <p class="not-reg-msg">登録されていません。下記のIDを管理者にお伝えください。</p>
+    <p class="not-reg-msg">まだ登録されていません。<br>下の「本部にIDを送る」を押して、<b>本部との個別トーク</b>に送ってください。</p>
+    <p class="not-reg-id-label">氏名：</p>
+    <div id="notRegName" class="not-reg-name">—</div>
     <p class="not-reg-id-label">あなたのID：</p>
     <input type="text" id="notRegId" class="not-reg-id" readonly>
+    <button type="button" class="not-reg-send" id="notRegSend">本部にIDを送る</button>
+    <button type="button" class="not-reg-copy" id="notRegCopy">IDをコピー</button>
+    <p class="not-reg-status" id="notRegStatus"></p>
   </div>
 </div>
 
@@ -1300,9 +1311,73 @@ function initCalendar() {
 function showNotRegistered(profile) {
   $('app').style.display = 'none';
   $('notReg').style.display = 'flex';
+
+  const userId = (profile && profile.userId) ? profile.userId : '';
+  const displayName = (profile && profile.displayName) ? profile.displayName : '';
+
   const idEl = $('notRegId');
-  idEl.value = (profile && profile.userId) ? profile.userId : '';
+  idEl.value = userId;
   idEl.onclick = function () { this.focus(); this.select(); };
+
+  $('notRegName').textContent = displayName || '—';
+
+  // 本部に送る／コピーする本文（氏名＋userId）
+  const msgText = '【出勤簿 ID登録】\n氏名：' + (displayName || '(未取得)') +
+                  '\nuserId：' + (userId || '(未取得)');
+
+  const statusEl = $('notRegStatus');
+  function setStatus(text, isErr) {
+    statusEl.textContent = text;
+    statusEl.className = 'not-reg-status' + (isErr ? ' err' : '');
+  }
+
+  // クリップボードへコピー（新API→失敗時は旧方式）
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise(function (resolve, reject) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+        resolve();
+      } catch (e) { reject(e); }
+    });
+  }
+
+  // 「本部にIDを送る」：sendMessage を試し、ダメならコピーにフォールバック
+  $('notRegSend').onclick = function () {
+    const canSend = (typeof woff !== 'undefined') && woff.isInClient &&
+                    woff.isInClient() && woff.sendMessage;
+    if (canSend) {
+      woff.sendMessage({ content: msgText }).then(function () {
+        setStatus('✓ 送信しました。本部の登録をお待ちください。', false);
+      }).catch(function () {
+        copyText(msgText).then(function () {
+          setStatus('自動送信できなかったため、コピーしました。本部のトークに貼り付けて送ってください。', true);
+        }).catch(function () {
+          setStatus('送信もコピーもできませんでした。上のIDを本部にお伝えください。', true);
+        });
+      });
+    } else {
+      copyText(msgText).then(function () {
+        setStatus('コピーしました。本部のトークに貼り付けて送ってください。', true);
+      }).catch(function () {
+        setStatus('コピーできませんでした。上のIDを本部にお伝えください。', true);
+      });
+    }
+  };
+
+  // 「IDをコピー」
+  $('notRegCopy').onclick = function () {
+    copyText(msgText).then(function () {
+      setStatus('コピーしました。本部のトークに貼り付けて送ってください。', false);
+    }).catch(function () {
+      setStatus('コピーできませんでした。上のIDを本部にお伝えください。', true);
+    });
+  };
 }
 
 function bootApp(staffDef, displayName) {
