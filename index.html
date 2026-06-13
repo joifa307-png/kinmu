@@ -101,6 +101,33 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 .cal-day.selected{background:#dcefe2;color:#0f6e56}
 .cal-day:disabled,.cal-day.disabled{color:#d8d2ce;cursor:default}
 .cal-close{width:100%;margin-top:12px;padding:10px;border:2px solid #d8d2ce;border-radius:10px;background:#fff;font-size:.85rem;font-weight:600;color:#37322f;cursor:pointer;font-family:inherit}
+.btn-history-row{display:flex;justify-content:center;margin-top:12px}
+.history-view{position:fixed;inset:0;background:#fde8d0;z-index:150;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.history-inner{max-width:480px;margin:0 auto;padding:12px 14px 32px}
+.hist-back{background:none;border:none;color:#0f6e56;font-size:.85rem;font-weight:600;padding:4px 0;cursor:pointer;font-family:inherit;margin-bottom:8px}
+.hist-title{font-size:1.1rem;font-weight:700;margin-bottom:12px}
+.hist-period-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.hist-period-nav button{background:none;border:none;font-size:1.4rem;color:#0f6e56;padding:4px 12px;cursor:pointer;line-height:1}
+.hist-period-nav button:disabled{opacity:.3;cursor:default}
+.hist-period-label{flex:1;text-align:center;font-size:.9rem;font-weight:600;line-height:1.4}
+.hist-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.hist-sum-item{background:#fff;border-radius:10px;padding:10px 8px;text-align:center}
+.hist-sum-item .val{font-size:.95rem;font-weight:700;color:#0f6e56}
+.hist-sum-item .lbl{font-size:.65rem;color:#6b6562;margin-top:2px}
+.hist-status{text-align:center;padding:20px;color:#6b6562;font-size:.85rem}
+.hist-status.error{color:#a32d2d}
+.hist-retry{margin-top:10px;padding:8px 20px;border:2px solid #d8d2ce;border-radius:20px;background:#fff;font-size:.85rem;font-weight:600;cursor:pointer;font-family:inherit}
+.hist-list{display:flex;flex-direction:column;gap:6px}
+.hist-row{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;font-size:.8rem;font-weight:600}
+.hist-row .hist-date{flex:0 0 5.5em}
+.hist-row .hist-shift{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-row .hist-work{flex:0 0 2.8em;text-align:right;font-size:.75rem}
+.hist-row .hist-ot{flex:0 0 2.8em;text-align:right;font-size:.75rem;opacity:.85}
+.hist-row .hist-tag{flex:0 0 auto;font-size:.7rem;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,.5)}
+.hist-row.st-work{background:#dcefe2;color:#0f6e56}
+.hist-row.st-hol{background:#faeeda;color:#854f0b}
+.hist-row.st-paid{background:#e6f1fb;color:#185fa5}
+.hist-row.st-abs{background:#fcebeb;color:#a32d2d}
 </style>
 </head>
 <body>
@@ -190,6 +217,26 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
   <div class="warn" id="warnMsg"></div>
   <button type="button" class="btn-submit" id="btnSubmit">登録する</button>
+  <div class="btn-history-row">
+    <button type="button" class="chip" id="btnHistory">履歴</button>
+  </div>
+</div>
+
+<div id="historyView" class="history-view" style="display:none" aria-hidden="true">
+  <div class="history-inner">
+    <button type="button" class="hist-back" id="histBack">← 入力に戻る</button>
+    <div class="hist-title">勤務履歴</div>
+    <div class="card">
+      <div class="hist-period-nav">
+        <button type="button" id="histPrevPeriod" aria-label="前月度">&#8249;</button>
+        <div class="hist-period-label" id="histPeriodLabel"></div>
+        <button type="button" id="histNextPeriod" aria-label="翌月度">&#8250;</button>
+      </div>
+      <div id="histSummary" class="hist-summary" style="display:none"></div>
+      <div id="histStatus" class="hist-status">読み込み中…</div>
+      <div id="histList" class="hist-list"></div>
+    </div>
+  </div>
 </div>
 
 <div id="notReg" class="not-reg" style="display:none">
@@ -219,7 +266,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -291,6 +338,60 @@ function fmtTime(min) {
 }
 function fmtHours(min) {
   return (min / 60).toFixed(1) + 'H';
+}
+
+const DOW_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+
+/* ── 締め期間（月度） ── */
+function getPeriod(baseDate) {
+  const d = baseDate || todayStr();
+  const [y, m, day] = d.split('-').map(Number);
+  let periodYear, periodMonth;
+  if (day >= 11) {
+    periodYear = y;
+    periodMonth = m;
+  } else {
+    const prev = new Date(y, m - 2, 1);
+    periodYear = prev.getFullYear();
+    periodMonth = prev.getMonth() + 1;
+  }
+  const from = `${periodYear}-${String(periodMonth).padStart(2, '0')}-11`;
+  const endDt = new Date(periodYear, periodMonth, 10);
+  const to = `${endDt.getFullYear()}-${String(endDt.getMonth() + 1).padStart(2, '0')}-${String(endDt.getDate()).padStart(2, '0')}`;
+  const tm = endDt.getMonth() + 1;
+  const td = endDt.getDate();
+  return {
+    label: `${periodMonth}月度`,
+    from,
+    to,
+    periodYear,
+    periodMonth,
+    rangeLabel: `${periodMonth}/11〜${tm}/${td}`
+  };
+}
+
+function getPeriodByOffset(offset) {
+  const cur = getPeriod(todayStr());
+  const dt = new Date(cur.periodYear, cur.periodMonth - 1 - offset, 15);
+  const base = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-15`;
+  return getPeriod(base);
+}
+
+function fmtDateWithDow(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return `${m}/${d}（${DOW_LABELS[dt.getDay()]}）`;
+}
+
+function shiftLabel(shiftKey) {
+  return (shiftKey && shiftMaster[shiftKey]) ? shiftMaster[shiftKey].label : (shiftKey || '—');
+}
+
+function recordDisplayTag(rec) {
+  if (rec.status === 'paid_leave') return { text: '有給', cls: 'st-paid' };
+  if (rec.status === 'absence') return { text: '欠勤', cls: 'st-abs' };
+  if (rec.holidayWorkFlag) return { text: '休出', cls: 'st-hol' };
+  return { text: '通常', cls: 'st-work' };
 }
 
 /* ── ユーティリティ ── */
@@ -403,6 +504,8 @@ let dialsLocked = true;
 let dialsVisible = false;
 let calViewYear = 0;
 let calViewMonth = 0;
+let histPeriodOffset = 0;
+let histLoading = false;
 
 const $ = id => document.getElementById(id);
 
@@ -869,6 +972,22 @@ async function fetchRecordFromGas(date, staffId) {
   }
 }
 
+async function fetchRecordsByStaff(staffId, from, to) {
+  if (!gasConfigured()) {
+    return { ok: false, error: '履歴を取得できませんでした。通信状況を確認してください。' };
+  }
+  try {
+    const url = `${GAS_URL}?type=recordsByStaff&staffId=${encodeURIComponent(staffId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+    const res = await fetch(url);
+    if (!res.ok) return { ok: false, error: '履歴を取得できませんでした。通信状況を確認してください。' };
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error || '履歴を取得できませんでした。通信状況を確認してください。' };
+    return { ok: true, records: data.records || [] };
+  } catch (_) {
+    return { ok: false, error: '履歴を取得できませんでした。通信状況を確認してください。' };
+  }
+}
+
 async function saveRecordToGas(record) {
   const errMsg = '保存できませんでした。通信状況を確認してもう一度お試しください';
   if (!gasConfigured()) {
@@ -955,6 +1074,119 @@ async function submitRecord() {
     $('warnMsg').textContent = result.error || '保存できませんでした。通信状況を確認してもう一度お試しください';
   }
   render();
+}
+
+/* ── 履歴 ── */
+function openHistory() {
+  if (!staff) return;
+  histPeriodOffset = 0;
+  $('historyView').style.display = 'block';
+  $('historyView').setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  loadHistory();
+}
+
+function closeHistory() {
+  $('historyView').style.display = 'none';
+  $('historyView').setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+}
+
+function updateHistPeriodNav() {
+  $('histPrevPeriod').disabled = histPeriodOffset >= 1;
+  $('histNextPeriod').disabled = histPeriodOffset <= 0;
+}
+
+function renderHistorySummary(records) {
+  const workRecs = records.filter(r => r.status === 'work');
+  const paidCount = records.filter(r => r.status === 'paid_leave').length;
+  const workDays = workRecs.length;
+  const totalWork = workRecs.reduce((s, r) => s + (Number(r.workMin) || 0), 0);
+  const totalOt = workRecs.reduce((s, r) => s + (Number(r.overtimeMin) || 0), 0);
+  const el = $('histSummary');
+  el.style.display = 'grid';
+  el.innerHTML = `
+    <div class="hist-sum-item"><div class="val">${workDays}日</div><div class="lbl">出勤日数</div></div>
+    <div class="hist-sum-item"><div class="val">${fmtHours(totalWork)}</div><div class="lbl">実働合計</div></div>
+    <div class="hist-sum-item"><div class="val">${fmtHours(totalOt)}</div><div class="lbl">残業合計</div></div>
+    <div class="hist-sum-item"><div class="val">${paidCount}日</div><div class="lbl">有給日数</div></div>`;
+}
+
+function renderHistoryList(records) {
+  const list = $('histList');
+  list.innerHTML = '';
+  const sorted = records.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  sorted.forEach(rec => {
+    const tag = recordDisplayTag(rec);
+    const row = document.createElement('div');
+    row.className = `hist-row ${tag.cls}`;
+    const isWork = rec.status === 'work';
+    row.innerHTML = `
+      <span class="hist-date">${fmtDateWithDow(rec.date)}</span>
+      <span class="hist-shift">${isWork ? shiftLabel(rec.shiftKey) : '—'}</span>
+      <span class="hist-work">${isWork ? fmtHours(Number(rec.workMin) || 0) : ''}</span>
+      <span class="hist-ot">${isWork ? fmtHours(Number(rec.overtimeMin) || 0) : ''}</span>
+      <span class="hist-tag">${tag.text}</span>`;
+    list.appendChild(row);
+  });
+}
+
+function renderHistoryError(msg) {
+  $('histSummary').style.display = 'none';
+  $('histList').innerHTML = '';
+  const st = $('histStatus');
+  st.className = 'hist-status error';
+  st.innerHTML = `${msg}<br><button type="button" class="hist-retry" id="histRetry">再試行</button>`;
+  $('histRetry').addEventListener('click', loadHistory);
+}
+
+async function loadHistory() {
+  if (!staff || histLoading) return;
+  histLoading = true;
+  const period = getPeriodByOffset(histPeriodOffset);
+  $('histPeriodLabel').innerHTML = `${period.label}<br><span style="font-size:.75rem;font-weight:500;color:#6b6562">（${period.rangeLabel}）</span>`;
+  updateHistPeriodNav();
+  $('histSummary').style.display = 'none';
+  $('histList').innerHTML = '';
+  $('histStatus').style.display = 'block';
+  $('histStatus').className = 'hist-status';
+  $('histStatus').textContent = '読み込み中…';
+
+  const result = await fetchRecordsByStaff(staff.staffId, period.from, period.to);
+  histLoading = false;
+
+  if (!result.ok) {
+    renderHistoryError(result.error);
+    return;
+  }
+
+  const records = result.records;
+  $('histStatus').textContent = '';
+  $('histStatus').style.display = 'none';
+
+  if (!records.length) {
+    $('histStatus').style.display = 'block';
+    $('histStatus').textContent = '記録がありません';
+    return;
+  }
+
+  renderHistorySummary(records);
+  renderHistoryList(records);
+}
+
+function initHistory() {
+  $('btnHistory').addEventListener('click', openHistory);
+  $('histBack').addEventListener('click', closeHistory);
+  $('histPrevPeriod').addEventListener('click', () => {
+    if (histPeriodOffset >= 1) return;
+    histPeriodOffset++;
+    loadHistory();
+  });
+  $('histNextPeriod').addEventListener('click', () => {
+    if (histPeriodOffset <= 0) return;
+    histPeriodOffset--;
+    loadHistory();
+  });
 }
 
 /* ── 日付ナビ ── */
@@ -1091,6 +1323,7 @@ function bootApp(staffDef, displayName) {
   $('btnPrev').addEventListener('click', () => changeDate(-1));
   $('btnNext').addEventListener('click', () => changeDate(1));
   initCalendar();
+  initHistory();
   $('chipLate').addEventListener('click', () => tog('late'));
   $('chipHol').addEventListener('click', () => tog('hol'));
   $('chipSick').addEventListener('click', () => setAbs('sick'));
