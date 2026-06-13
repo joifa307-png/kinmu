@@ -118,12 +118,13 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 .hist-status.error{color:#a32d2d}
 .hist-retry{margin-top:10px;padding:8px 20px;border:2px solid #d8d2ce;border-radius:20px;background:#fff;font-size:.85rem;font-weight:600;cursor:pointer;font-family:inherit}
 .hist-list{display:flex;flex-direction:column;gap:6px}
-.hist-row{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;font-size:.8rem;font-weight:600}
-.hist-row .hist-date{flex:0 0 5.5em}
-.hist-row .hist-shift{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hist-row .hist-work{flex:0 0 2.8em;text-align:right;font-size:.75rem}
-.hist-row .hist-ot{flex:0 0 2.8em;text-align:right;font-size:.75rem;opacity:.85}
-.hist-row .hist-tag{flex:0 0 auto;font-size:.7rem;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,.5)}
+.hist-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:10px 12px;border-radius:10px;font-size:.8rem;font-weight:600}
+.hist-row .hist-date{flex:0 0 auto;white-space:nowrap}
+.hist-row .hist-shift{flex:0 0 auto}
+.hist-row .hist-work{flex:0 0 auto}
+.hist-row .hist-ot{flex:0 0 auto;min-width:2.5em}
+.hist-row .hist-label-only{flex:1;font-weight:600}
+.hist-row .hist-tag{flex:0 0 auto;font-size:.75rem;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,.45)}
 .hist-row.st-work{background:#dcefe2;color:#0f6e56}
 .hist-row.st-hol{background:#faeeda;color:#854f0b}
 .hist-row.st-paid{background:#e6f1fb;color:#185fa5}
@@ -266,7 +267,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -387,11 +388,34 @@ function shiftLabel(shiftKey) {
   return (shiftKey && shiftMaster[shiftKey]) ? shiftMaster[shiftKey].label : (shiftKey || '—');
 }
 
-function recordDisplayTag(rec) {
-  if (rec.status === 'paid_leave') return { text: '有給', cls: 'st-paid' };
-  if (rec.status === 'absence') return { text: '欠勤', cls: 'st-abs' };
-  if (rec.holidayWorkFlag) return { text: '休出', cls: 'st-hol' };
-  return { text: '通常', cls: 'st-work' };
+function historyRowClass(rec) {
+  if (rec.status === 'paid_leave') return 'st-paid';
+  if (rec.status === 'absence') return 'st-abs';
+  if (rec.status === 'work' && rec.holidayWorkFlag) return 'st-hol';
+  return 'st-work';
+}
+
+function fmtOtDisplay(min) {
+  const n = Number(min) || 0;
+  return n > 0 ? fmtHours(n) : '';
+}
+
+function buildHistoryRowHtml(rec) {
+  const date = fmtDateWithDow(rec.date);
+  if (rec.status === 'paid_leave') {
+    return `<span class="hist-date">${date}</span><span class="hist-label-only">有給</span>`;
+  }
+  if (rec.status === 'absence') {
+    return `<span class="hist-date">${date}</span><span class="hist-label-only">欠勤</span>`;
+  }
+  const shift = shiftLabel(rec.shiftKey);
+  const work = fmtHours(Number(rec.workMin) || 0);
+  const ot = fmtOtDisplay(rec.overtimeMin);
+  let html = `<span class="hist-date">${date}</span><span class="hist-shift">${shift}</span><span class="hist-work">${work}</span><span class="hist-ot">${ot}</span>`;
+  if (rec.holidayWorkFlag) {
+    html += `<span class="hist-tag">休出</span>`;
+  }
+  return html;
 }
 
 /* ── ユーティリティ ── */
@@ -1117,16 +1141,9 @@ function renderHistoryList(records) {
   list.innerHTML = '';
   const sorted = records.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   sorted.forEach(rec => {
-    const tag = recordDisplayTag(rec);
     const row = document.createElement('div');
-    row.className = `hist-row ${tag.cls}`;
-    const isWork = rec.status === 'work';
-    row.innerHTML = `
-      <span class="hist-date">${fmtDateWithDow(rec.date)}</span>
-      <span class="hist-shift">${isWork ? shiftLabel(rec.shiftKey) : '—'}</span>
-      <span class="hist-work">${isWork ? fmtHours(Number(rec.workMin) || 0) : ''}</span>
-      <span class="hist-ot">${isWork ? fmtHours(Number(rec.overtimeMin) || 0) : ''}</span>
-      <span class="hist-tag">${tag.text}</span>`;
+    row.className = `hist-row ${historyRowClass(rec)}`;
+    row.innerHTML = buildHistoryRowHtml(rec);
     list.appendChild(row);
   });
 }
