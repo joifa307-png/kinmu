@@ -163,7 +163,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
       <button type="button" class="chip" id="chipHol" data-key="hol">休日出勤</button>
     </div>
     <div class="reason-block" id="lateReasonBlock" style="display:none">
-      <input type="text" id="lateNote" placeholder="遅刻・早退の理由（任意）" maxlength="200">
+      <input type="text" id="lateNote" placeholder="遅刻・早退の理由（必須）" maxlength="200">
     </div>
   </div>
 
@@ -627,6 +627,9 @@ function getValidation() {
   if (status === 'work' && short && !lateFlag) {
     return { ok: false, msg: `所定（${fmtHours(shiftWorkMin)}）より短い勤務です。「遅刻・早退」を選んでください。` };
   }
+  if (lateFlag && isEmpty(lateNote)) {
+    return { ok: false, msg: '遅刻・早退の理由を入力してください。' };
+  }
   if (status === 'absence' && !absenceReason) {
     return { ok: false, msg: '欠勤の理由（病欠／その他）を選んでください。' };
   }
@@ -688,6 +691,7 @@ function render() {
 
   $('warnMsg').textContent = val.msg;
   $('btnSubmit').disabled = !val.ok || saving;
+  $('btnSubmit').textContent = saving ? '送信中…' : '登録する';
 
   applyDialLockUI();
   saveDraft();
@@ -866,25 +870,35 @@ async function fetchRecordFromGas(date, staffId) {
 }
 
 async function saveRecordToGas(record) {
+  const errMsg = '保存できませんでした。通信状況を確認してもう一度お試しください';
   if (!gasConfigured()) {
-    cacheRecord(record);
-    return { ok: true, local: true, record };
+    return { ok: false, error: errMsg };
   }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
   try {
     const res = await fetch(GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(record)
+      body: JSON.stringify(record),
+      signal: controller.signal
     });
-    const data = await res.json();
+    clearTimeout(timer);
+    let data;
+    try {
+      data = await res.json();
+    } catch (_) {
+      return { ok: false, error: errMsg };
+    }
     if (data.ok) {
       const saved = data.record || record;
       cacheRecord(saved);
       return { ok: true, record: saved };
     }
-    return { ok: false, error: data.error || '保存に失敗しました' };
+    return { ok: false, error: data.error || errMsg };
   } catch (e) {
-    return { ok: false, error: e.message || '通信エラー' };
+    clearTimeout(timer);
+    return { ok: false, error: errMsg };
   }
 }
 
@@ -916,12 +930,12 @@ async function loadRecordForDate(date) {
 }
 
 async function submitRecord() {
-  const val = getValidation();
-  if (!val.ok || saving) return;
-
   lateNote = $('lateNote').value;
   absenceNote = $('absenceNote').value;
   memo = $('memo').value;
+
+  const val = getValidation();
+  if (!val.ok || saving) return;
 
   saving = true;
   $('warnMsg').textContent = '';
@@ -935,10 +949,10 @@ async function submitRecord() {
     try { localStorage.removeItem(draftKey()); } catch (_) { /* ignore */ }
     if (result.record) applyRecord(result.record);
     else hideDials();
-    showBriefToast(result.local ? 'ローカルに保存しました' : '登録しました');
+    showBriefToast('登録しました');
   } else {
-    $('warnMsg').textContent = result.error || '保存に失敗しました';
-    showBriefToast(result.error || '保存に失敗しました');
+    saveDraft();
+    $('warnMsg').textContent = result.error || '保存できませんでした。通信状況を確認してもう一度お試しください';
   }
   render();
 }
