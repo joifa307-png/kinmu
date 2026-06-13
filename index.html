@@ -8,16 +8,19 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:24px;-webkit-text-size-adjust:100%}
-body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;background:#9999cc;color:#37322f;min-height:100vh;line-height:1.5}
+body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;background:#fde8d0;color:#37322f;min-height:100vh;line-height:1.5}
 .app{max-width:480px;margin:0 auto;padding:12px 14px 32px}
 .card{background:#FCFBFA;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(55,50,47,.06)}
 .name-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(55,50,47,.08)}
+.name-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px}
+.app-version{font-size:.55rem;color:#9a9490;flex-shrink:0;line-height:1.4;padding-top:2px}
 .name-card .staff-name{font-size:1.25rem;font-weight:700;margin-bottom:4px}
 .name-card .staff-meta{font-size:.85rem;color:#6b6562;margin-bottom:12px}
 .date-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:10px;border-top:1px solid #ece8e5}
 .date-nav button{background:none;border:none;font-size:1.4rem;color:#0f6e56;padding:4px 12px;cursor:pointer;line-height:1}
 .date-nav button:disabled{opacity:.3;cursor:default}
-.date-nav .date-label{font-size:.95rem;font-weight:600;flex:1;text-align:center}
+.date-nav .date-label{font-size:.95rem;font-weight:600;flex:1;text-align:center;background:none;border:none;color:#37322f;font-family:inherit;cursor:pointer;padding:4px 8px;border-radius:8px}
+.date-nav .date-label:active{background:#f5f3f1}
 .section-label{font-size:.8rem;font-weight:600;color:#6b6562;margin-bottom:8px;letter-spacing:.02em}
 .shift-toggles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .shift-toggle{border:2px solid #d8d2ce;border-radius:10px;padding:12px 8px;text-align:center;font-size:.9rem;font-weight:600;background:#fff;color:#37322f;cursor:pointer;transition:all .15s}
@@ -30,8 +33,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku
 .dial-wrap.dials-editing .dial-wheels{border:2px solid #0f6e56;border-radius:12px;padding:8px 4px 4px;background:#f8fcf9;margin-top:8px}
 .dial-header{display:flex;align-items:center;gap:8px;margin-top:10px}
 .dial-header .range{flex:1;font-size:.9rem;font-weight:600;min-width:0}
-.btn-dial-edit{flex:0 0 auto;min-width:4.2em;border:2px solid #d8d2ce;border-radius:10px;padding:12px 8px;text-align:center;font-size:.9rem;font-weight:600;background:#fff;color:#37322f;cursor:pointer;font-family:inherit;transition:all .15s}
-.btn-dial-edit.editing{border-color:#0f6e56;background:#0f6e56;color:#fff}
+.btn-dial-edit{flex:0 0 auto;min-width:4.2em;border:2px solid #d8d2ce;border-radius:10px;padding:12px 8px;text-align:center;font-size:.9rem;font-weight:600;background:#fff;color:#ce5242;cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-dial-edit.editing{border-color:#ce5242;background:#ce5242;color:#fff}
 .btn-dial-edit:disabled{opacity:.4;cursor:default}
 .dial-wheels{margin-top:0}
 .dial-row{display:flex;align-items:center;justify-content:center;gap:4px}
@@ -83,16 +86,34 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 .not-reg-id:focus{outline:2px solid #0f6e56;outline-offset:0}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2a2522;color:#fff;padding:10px 20px;border-radius:20px;font-size:.85rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100}
 .toast.show{opacity:1}
+.cal-overlay{position:fixed;inset:0;background:rgba(55,50,47,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
+.cal-modal{background:#fff;border-radius:14px;padding:16px;width:100%;max-width:340px;box-shadow:0 4px 20px rgba(55,50,47,.15)}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.cal-header button{background:none;border:none;font-size:1.4rem;color:#0f6e56;padding:4px 12px;cursor:pointer;line-height:1}
+.cal-header button:disabled{opacity:.3;cursor:default}
+.cal-title{font-size:.95rem;font-weight:700;flex:1;text-align:center}
+.cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
+.cal-weekdays span{text-align:center;font-size:.65rem;color:#6b6562;font-weight:600;padding:4px 0}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-day{aspect-ratio:1;border:none;border-radius:8px;background:#fff;font-size:.85rem;font-weight:600;color:#37322f;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;padding:0}
+.cal-day.cal-empty{background:transparent;pointer-events:none}
+.cal-day.today{box-shadow:inset 0 0 0 2px #0f6e56}
+.cal-day.selected{background:#dcefe2;color:#0f6e56}
+.cal-day:disabled,.cal-day.disabled{color:#d8d2ce;cursor:default}
+.cal-close{width:100%;margin-top:12px;padding:10px;border:2px solid #d8d2ce;border-radius:10px;background:#fff;font-size:.85rem;font-weight:600;color:#37322f;cursor:pointer;font-family:inherit}
 </style>
 </head>
 <body>
 <div id="app" class="app" style="display:none">
   <div class="name-card">
-    <div class="staff-name" id="staffName"></div>
+    <div class="name-card-head">
+      <div class="staff-name" id="staffName"></div>
+      <span class="app-version" id="appVersion"></span>
+    </div>
     <div class="staff-meta" id="staffMeta"></div>
     <div class="date-nav">
       <button type="button" id="btnPrev" aria-label="前日">&#8249;</button>
-      <div class="date-label" id="dateLabel"></div>
+      <button type="button" class="date-label" id="dateLabel" aria-label="日付を選択"></button>
       <button type="button" id="btnNext" aria-label="翌日">&#8250;</button>
     </div>
   </div>
@@ -181,8 +202,24 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <div class="toast" id="toast"></div>
 
+<div id="calOverlay" class="cal-overlay" style="display:none" aria-hidden="true">
+  <div class="cal-modal" role="dialog" aria-label="日付選択">
+    <div class="cal-header">
+      <button type="button" id="calPrevMonth" aria-label="前月">&#8249;</button>
+      <span class="cal-title" id="calTitle"></span>
+      <button type="button" id="calNextMonth" aria-label="翌月">&#8250;</button>
+    </div>
+    <div class="cal-weekdays">
+      <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+    </div>
+    <div id="calGrid" class="cal-grid"></div>
+    <button type="button" id="calClose" class="cal-close">閉じる</button>
+  </div>
+</div>
+
 <script>
 /* ── 定数 ── */
+const APP_VERSION = '1.0.0';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -364,6 +401,8 @@ let saving = false;
 let loadedRecord = null;
 let dialsLocked = true;
 let dialsVisible = false;
+let calViewYear = 0;
+let calViewMonth = 0;
 
 const $ = id => document.getElementById(id);
 
@@ -911,13 +950,87 @@ function updateDateNav() {
   $('btnNext').disabled = currentDate >= today;
 }
 
+async function jumpToDate(dateStr) {
+  if (dateStr > todayStr()) return;
+  saveDraft();
+  currentDate = dateStr;
+  updateDateNav();
+  await loadRecordForDate(currentDate);
+}
+
 async function changeDate(delta) {
   const next = addDays(currentDate, delta);
   if (next > todayStr()) return;
-  saveDraft();
-  currentDate = next;
-  updateDateNav();
-  await loadRecordForDate(currentDate);
+  await jumpToDate(next);
+}
+
+function openCalendar() {
+  const [y, m] = currentDate.split('-').map(Number);
+  calViewYear = y;
+  calViewMonth = m;
+  renderCalendar();
+  $('calOverlay').style.display = 'flex';
+  $('calOverlay').setAttribute('aria-hidden', 'false');
+}
+
+function closeCalendar() {
+  $('calOverlay').style.display = 'none';
+  $('calOverlay').setAttribute('aria-hidden', 'true');
+}
+
+function calNavMonth(delta) {
+  calViewMonth += delta;
+  if (calViewMonth > 12) { calViewMonth = 1; calViewYear++; }
+  if (calViewMonth < 1) { calViewMonth = 12; calViewYear--; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  $('calTitle').textContent = `${calViewYear}年${calViewMonth}月`;
+  const grid = $('calGrid');
+  grid.innerHTML = '';
+  const today = todayStr();
+  const [ty, tm] = today.split('-').map(Number);
+  $('calNextMonth').disabled = calViewYear > ty || (calViewYear === ty && calViewMonth >= tm);
+
+  const startDow = new Date(calViewYear, calViewMonth - 1, 1).getDay();
+  const daysInMonth = new Date(calViewYear, calViewMonth, 0).getDate();
+
+  for (let i = 0; i < startDow; i++) {
+    const empty = document.createElement('div');
+    empty.className = 'cal-day cal-empty';
+    grid.appendChild(empty);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calViewYear}-${String(calViewMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cal-day';
+    btn.textContent = d;
+    if (dateStr === currentDate) btn.classList.add('selected');
+    if (dateStr === today) btn.classList.add('today');
+    if (dateStr > today) {
+      btn.disabled = true;
+      btn.classList.add('disabled');
+    } else {
+      btn.addEventListener('click', () => {
+        closeCalendar();
+        if (dateStr !== currentDate) jumpToDate(dateStr);
+      });
+    }
+    grid.appendChild(btn);
+  }
+}
+
+function initCalendar() {
+  $('dateLabel').addEventListener('click', openCalendar);
+  $('calClose').addEventListener('click', closeCalendar);
+  $('calPrevMonth').addEventListener('click', () => calNavMonth(-1));
+  $('calNextMonth').addEventListener('click', () => calNavMonth(1));
+  $('calOverlay').addEventListener('click', e => {
+    if (e.target === $('calOverlay')) closeCalendar();
+  });
 }
 
 /* ── ブート ── */
@@ -937,6 +1050,7 @@ function bootApp(staffDef, displayName) {
   console.log('SHIFTS', SHIFTS);
 
   $('staffName').textContent = staff.name || displayName || '';
+  $('appVersion').textContent = 'v' + APP_VERSION;
   const fac = FACILITY_LABELS[staff.facilityId] || staff.facilityId;
   const job = JOB_LABELS[staff.jobType] || staff.jobType;
   $('staffMeta').textContent = `${staff.workType ? staff.workType + '　' : ''}${fac}　${job}`;
@@ -962,6 +1076,7 @@ function bootApp(staffDef, displayName) {
 
   $('btnPrev').addEventListener('click', () => changeDate(-1));
   $('btnNext').addEventListener('click', () => changeDate(1));
+  initCalendar();
   $('chipLate').addEventListener('click', () => tog('late'));
   $('chipHol').addEventListener('click', () => tog('hol'));
   $('chipSick').addEventListener('click', () => setAbs('sick'));
