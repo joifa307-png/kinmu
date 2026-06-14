@@ -90,7 +90,8 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 .not-reg-copy{width:100%;margin-top:10px;padding:13px;border:2px solid #d8d2ce;border-radius:10px;background:#fff;color:#37322f;font-size:.95rem;font-weight:600;cursor:pointer;font-family:inherit}
 .not-reg-status{font-size:.85rem;line-height:1.6;margin-top:14px;min-height:1.4em;text-align:center;color:#0f6e56}
 .not-reg-status.err{color:#ce5242}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2a2522;color:#fff;padding:10px 20px;border-radius:20px;font-size:.85rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100;white-space:pre-line;text-align:center}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2a2522;color:#fff;padding:10px 20px;border-radius:20px;font-size:.85rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100;white-space:pre-line;text-align:center;max-width:calc(100vw - 32px)}
+.toast.toast-farewell{background:#191970;color:#ee82ee;min-width:17em;padding:16px 36px;font-size:.92rem;line-height:1.65;word-break:keep-all}
 .toast.show{opacity:1}
 .cal-overlay{position:fixed;inset:0;background:rgba(55,50,47,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
 .cal-modal{background:#fff;border-radius:14px;padding:16px;width:100%;max-width:340px;box-shadow:0 4px 20px rgba(55,50,47,.15)}
@@ -548,15 +549,18 @@ function gasConfigured() {
   return !!(GAS_URL && !GAS_URL.includes('YOUR_DEPLOYMENT_ID'));
 }
 
-function showToast(msg) {
+function showToast(msg, kind) {
   const t = $('toast');
   t.textContent = msg;
+  t.classList.toggle('toast-farewell', kind === 'farewell');
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+  setTimeout(() => {
+    t.classList.remove('show', 'toast-farewell');
+  }, 2500);
 }
 
-function showBriefToast(msg) {
-  showToast(msg);
+function showBriefToast(msg, kind) {
+  showToast(msg, kind);
 }
 
 function isRecentRecordDate(dateStr) {
@@ -1114,7 +1118,10 @@ async function submitRecord() {
     try { localStorage.removeItem(draftKey()); } catch (_) { /* ignore */ }
     if (result.record) applyRecord(result.record);
     else hideDials();
-    showBriefToast(saveSuccessToast(currentDate));
+    showBriefToast(
+      saveSuccessToast(currentDate),
+      isRecentRecordDate(currentDate) ? 'farewell' : undefined
+    );
   } else {
     saveDraft();
     $('warnMsg').textContent = result.error || '保存できませんでした。通信状況を確認してもう一度お試しください';
