@@ -38,8 +38,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku
 .btn-dial-edit.editing{border-color:#ce5242;background:#ce5242;color:#fff}
 .btn-dial-edit:disabled{opacity:.4;cursor:default}
 .dial-wheels{margin-top:0}
-.overtime-reason-panel{margin-top:8px;padding-top:8px;border-top:1px solid #ece8e5}
-.overtime-reason-panel .section-label{margin-bottom:8px}
+.overtime-reason-panel,.late-reason-panel{margin-top:8px;padding-top:8px;border-top:1px solid #ece8e5}
+.overtime-reason-panel .section-label,.late-reason-panel .section-label{margin-bottom:8px}
+.hol-row{margin-top:10px}
 .dial-row{display:flex;align-items:center;justify-content:center;gap:4px}
 .dial-col{flex:1;max-width:72px}
 .dial-label{text-align:center;font-size:.7rem;color:#6b6562;margin-bottom:4px}
@@ -168,6 +169,9 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
   <div class="card" id="workArea">
     <div class="section-label">シフト</div>
     <div class="shift-toggles" id="shiftToggles"></div>
+    <div class="chip-row hol-row">
+      <button type="button" class="chip" id="chipHol" data-key="hol">休日出勤</button>
+    </div>
 
     <div class="dial-wrap dials-locked dials-hidden" id="dialWrap">
       <div class="dial-header">
@@ -193,7 +197,17 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
           <div class="dial-label">終了 分</div>
           <div class="wheel-outer"><div class="wheel-highlight"></div><div class="wheel" id="wmEnd"></div></div>
         </div>
+        </div>
       </div>
+      <div id="lateReasonPanel" class="late-reason-panel" style="display:none">
+        <div class="section-label">遅刻・早退（所定より短い・必須）</div>
+        <div class="chip-row" id="lateKindRow">
+          <button type="button" class="chip" data-kind="late">遅刻</button>
+          <button type="button" class="chip" data-kind="early">早退</button>
+        </div>
+        <div class="reason-block" id="lateNoteBlock">
+          <input type="text" id="lateNote" placeholder="理由（必須）" maxlength="200">
+        </div>
       </div>
       <div id="overtimeReasonPanel" class="overtime-reason-panel" style="display:none">
         <div class="section-label">残業理由（1時間以上・必須）</div>
@@ -214,17 +228,6 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
   <div class="banner work" id="banner">
     <span class="banner-main" id="bannerMain">実働 0.0H</span>
     <span class="banner-sub" id="bannerSub">残業 0.0H</span>
-  </div>
-
-  <div class="card">
-    <div class="section-label">状態</div>
-    <div class="chip-row">
-      <button type="button" class="chip" id="chipLate" data-key="late">遅刻・早退</button>
-      <button type="button" class="chip" id="chipHol" data-key="hol">休日出勤</button>
-    </div>
-    <div class="reason-block" id="lateReasonBlock" style="display:none">
-      <input type="text" id="lateNote" placeholder="遅刻・早退の理由（必須）" maxlength="200">
-    </div>
   </div>
 
   <div class="card">
@@ -306,7 +309,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.3';
+const APP_VERSION = '1.2.4';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -583,7 +586,7 @@ let startMin = 510;
 let endMin = 1050;
 let breakMin = 60;
 let status = 'work';
-let lateFlag = false;
+let lateKind = null;
 let lateNote = '';
 let holidayWorkFlag = false;
 let absenceReason = null;
@@ -598,6 +601,7 @@ let loadedRecord = null;
 let dialsLocked = true;
 let dialsVisible = false;
 let overtimePanelVisible = false;
+let latePanelVisible = false;
 let calViewYear = 0;
 let calViewMonth = 0;
 let histPeriodOffset = 0;
@@ -838,14 +842,17 @@ function toggleDialEdit() {
     dialsVisible = true;
     dialsLocked = false;
     overtimePanelVisible = false;
+    latePanelVisible = false;
     applyDialLockUI();
     if (!wheelsMounted) mountDials();
     else requestAnimationFrame(() => requestAnimationFrame(() => syncWheels()));
   } else {
     lockDials();
-    const { ot } = calc();
+    const { ot, short } = calc();
     overtimePanelVisible = needsOvertimeReason(ot);
     if (!overtimePanelVisible) syncOvertimeReasonState(ot);
+    latePanelVisible = needsLateReason(short);
+    if (!latePanelVisible) syncLateReasonState(short);
     render();
   }
 }
@@ -884,6 +891,7 @@ function selShift(i) {
   endMin = shift.end;
   breakMin = shift.breakMin;
   overtimePanelVisible = false;
+  latePanelVisible = false;
   hideDials();
   buildToggles();
   render();
@@ -891,12 +899,7 @@ function selShift(i) {
 }
 
 function tog(key) {
-  if (key === 'late') {
-    lateFlag = !lateFlag;
-    if (!lateFlag) lateNote = '';
-  } else if (key === 'hol') {
-    holidayWorkFlag = !holidayWorkFlag;
-  }
+  if (key === 'hol') holidayWorkFlag = !holidayWorkFlag;
   render();
 }
 
@@ -908,6 +911,9 @@ function setMode(m) {
     overtimeReason = null;
     overtimeNote = '';
     overtimePanelVisible = false;
+    lateKind = null;
+    lateNote = '';
+    latePanelVisible = false;
   }
   render();
 }
@@ -931,6 +937,28 @@ function shouldShowOvertimePanel(ot) {
   return overtimePanelVisible && needsOvertimeReason(ot) && dialsLocked && status === 'work';
 }
 
+function setLateKind(kind) {
+  lateKind = kind;
+  render();
+}
+
+function syncLateReasonState(short) {
+  if (status !== 'work' || !short) {
+    lateKind = null;
+    lateNote = '';
+    latePanelVisible = false;
+    if ($('lateNote')) $('lateNote').value = '';
+  }
+}
+
+function needsLateReason(short) {
+  return status === 'work' && short;
+}
+
+function shouldShowLatePanel(short) {
+  return latePanelVisible && needsLateReason(short) && dialsLocked && status === 'work';
+}
+
 function needsOvertimeReason(ot) {
   return status === 'work' && ot >= OVERTIME_THRESHOLD_MIN;
 }
@@ -951,12 +979,14 @@ function calc() {
 }
 
 function getValidation() {
-  const { short, shiftWorkMin, ot } = calc();
-  if (status === 'work' && short && !lateFlag) {
-    return { ok: false, msg: `所定（${fmtHours(shiftWorkMin)}）より短い勤務です。「遅刻・早退」を選んでください。` };
-  }
-  if (lateFlag && isEmpty(lateNote)) {
-    return { ok: false, msg: '遅刻・早退の理由を入力してください。' };
+  const { short, ot } = calc();
+  if (shouldShowLatePanel(short)) {
+    if (!lateKind) {
+      return { ok: false, msg: '遅刻または早退を選んでください。' };
+    }
+    if (isEmpty(lateNote)) {
+      return { ok: false, msg: '遅刻・早退の理由を入力してください。' };
+    }
   }
   if (needsOvertimeReason(ot) && overtimePanelVisible) {
     if (!overtimeReason) {
@@ -979,8 +1009,9 @@ function render() {
   if (!staff) return;
 
   const shift = SHIFTS[selShiftIdx];
-  const { work, ot } = calc();
+  const { work, ot, short } = calc();
   syncOvertimeReasonState(ot);
+  syncLateReasonState(short);
   const val = getValidation();
 
   $('dialRange').textContent = `${fmtTime(startMin)} 〜 ${fmtTime(endMin)}`;
@@ -1016,11 +1047,17 @@ function render() {
 
   $('workArea').classList.toggle('dimmed', status !== 'work');
 
-  $('chipLate').classList.toggle('active', lateFlag);
-  $('chipLate').classList.toggle('late', lateFlag);
   $('chipHol').classList.toggle('active', holidayWorkFlag);
   $('chipHol').classList.toggle('hol', holidayWorkFlag);
-  $('lateReasonBlock').style.display = lateFlag ? 'block' : 'none';
+
+  const showLatePanel = shouldShowLatePanel(short);
+  $('lateReasonPanel').style.display = showLatePanel ? 'block' : 'none';
+  document.querySelectorAll('#lateKindRow .chip').forEach(btn => {
+    const k = btn.dataset.kind;
+    btn.classList.toggle('active', lateKind === k);
+    btn.classList.toggle('late', lateKind === k);
+  });
+  $('lateNoteBlock').style.display = showLatePanel ? 'block' : 'none';
 
   const showOtPanel = shouldShowOvertimePanel(ot);
   $('overtimeReasonPanel').style.display = showOtPanel ? 'block' : 'none';
@@ -1080,7 +1117,7 @@ function applyRecord(rec) {
   }
   loadedRecord = rec;
   status = rec.status || 'work';
-  lateFlag = !!rec.lateFlag;
+  lateKind = rec.lateKind || (rec.lateFlag ? 'late' : null);
   lateNote = rec.lateNote || '';
   holidayWorkFlag = !!rec.holidayWorkFlag;
   absenceReason = rec.absenceReason || null;
@@ -1108,9 +1145,12 @@ function applyRecord(rec) {
     const shift = SHIFTS[selShiftIdx];
     const work = computeActualWork(startMin, endMin, breakMin);
     const ot = computeOvertime(work, shift ? shift.workMin : 0);
+    const short = isShortWork(work, shift ? shift.workMin : 0);
     overtimePanelVisible = needsOvertimeReason(ot);
+    latePanelVisible = needsLateReason(short);
   } else {
     overtimePanelVisible = false;
+    latePanelVisible = false;
   }
   render();
   mountDials();
@@ -1122,7 +1162,7 @@ function applyDraft(d) {
   startMin = d.startMin != null ? d.startMin : startMin;
   endMin = d.endMin != null ? d.endMin : endMin;
   breakMin = d.breakMin != null ? d.breakMin : breakMin;
-  lateFlag = !!d.lateFlag;
+  lateKind = d.lateKind || (d.lateFlag ? 'late' : null);
   lateNote = d.lateNote || '';
   holidayWorkFlag = !!d.holidayWorkFlag;
   absenceReason = d.absenceReason || null;
@@ -1140,9 +1180,12 @@ function applyDraft(d) {
     const shift = SHIFTS[selShiftIdx];
     const work = computeActualWork(startMin, endMin, breakMin);
     const ot = computeOvertime(work, shift ? shift.workMin : 0);
+    const short = isShortWork(work, shift ? shift.workMin : 0);
     overtimePanelVisible = needsOvertimeReason(ot) && !!overtimeReason;
+    latePanelVisible = needsLateReason(short) && !!lateKind;
   } else {
     overtimePanelVisible = false;
+    latePanelVisible = false;
   }
   render();
   mountDials();
@@ -1151,7 +1194,7 @@ function applyDraft(d) {
 function resetForm() {
   loadedRecord = null;
   status = 'work';
-  lateFlag = false;
+  lateKind = null;
   lateNote = '';
   holidayWorkFlag = false;
   absenceReason = null;
@@ -1159,6 +1202,7 @@ function resetForm() {
   overtimeReason = null;
   overtimeNote = '';
   overtimePanelVisible = false;
+  latePanelVisible = false;
   memo = '';
   $('lateNote').value = '';
   $('absenceNote').value = '';
@@ -1196,8 +1240,9 @@ function buildRecord() {
     breakMin,
     workMin: status === 'work' ? work : 0,
     overtimeMin: status === 'work' ? ot : 0,
-    lateFlag,
-    lateNote: lateNote.trim(),
+    lateFlag: !!lateKind,
+    lateKind: lateKind || null,
+    lateNote: lateKind ? lateNote.trim() : '',
     holidayWorkFlag,
     absenceReason: status === 'absence' ? absenceReason : null,
     absenceNote: absenceNote.trim(),
@@ -1225,7 +1270,7 @@ function saveDraft() {
   try {
     localStorage.setItem(draftKey(), JSON.stringify({
       status, selShiftIdx, startMin, endMin, breakMin,
-      lateFlag, lateNote, holidayWorkFlag,
+      lateKind, lateNote, holidayWorkFlag,
       absenceReason, absenceNote, overtimeReason, overtimeNote, memo
     }));
   } catch (_) { /* ignore */ }
@@ -1732,8 +1777,11 @@ function bootApp(staffDef, displayName) {
   $('btnNext').addEventListener('click', () => changeDate(1));
   initCalendar();
   initHistory();
-  $('chipLate').addEventListener('click', () => tog('late'));
   $('chipHol').addEventListener('click', () => tog('hol'));
+  $('lateKindRow').addEventListener('click', e => {
+    const btn = e.target.closest('[data-kind]');
+    if (btn) setLateKind(btn.dataset.kind);
+  });
   $('chipSick').addEventListener('click', () => setAbs('sick'));
   $('chipOther').addEventListener('click', () => setAbs('other'));
   $('overtimeReasonRow').addEventListener('click', e => {
