@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>出勤簿</title>
 <script charset="utf-8" src="https://static.worksmobile.net/static/wm/woff/edge/3.7.1/sdk.js"></script>
 <style>
@@ -201,7 +202,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
   </div>
 
   <div class="card" id="overtimeReasonCard" style="display:none">
-    <div class="section-label">残業理由（1時間超・必須）</div>
+    <div class="section-label">残業理由（1時間以上・必須）</div>
     <div class="chip-row" id="overtimeReasonRow">
       <button type="button" class="chip" data-reason="care">利用者対応</button>
       <button type="button" class="chip" data-reason="records">記録・書類作成</button>
@@ -304,7 +305,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.1.1';
+const APP_VERSION = '1.2.0';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -840,7 +841,7 @@ function setOtReason(r) {
 }
 
 function syncOvertimeReasonState(ot) {
-  if (status !== 'work' || ot <= OVERTIME_THRESHOLD_MIN) {
+  if (status !== 'work' || ot < OVERTIME_THRESHOLD_MIN) {
     overtimeReason = null;
     overtimeNote = '';
     if ($('overtimeNote')) $('overtimeNote').value = '';
@@ -848,7 +849,7 @@ function syncOvertimeReasonState(ot) {
 }
 
 function needsOvertimeReason(ot) {
-  return status === 'work' && ot > OVERTIME_THRESHOLD_MIN;
+  return status === 'work' && ot >= OVERTIME_THRESHOLD_MIN;
 }
 
 function setAbs(r) {
@@ -876,7 +877,7 @@ function getValidation() {
   }
   if (needsOvertimeReason(ot)) {
     if (!overtimeReason) {
-      return { ok: false, msg: '残業が1時間を超えています。残業理由を選んでください。' };
+      return { ok: false, msg: '残業が1時間以上です。残業理由を選んでください。' };
     }
     if (overtimeReason === 'other' && isEmpty(overtimeNote)) {
       return { ok: false, msg: '「その他」の残業理由を入力してください。' };
@@ -1603,6 +1604,7 @@ function bootApp(staffDef, displayName) {
 
   $('staffName').textContent = staff.name || displayName || '';
   $('appVersion').textContent = 'v' + APP_VERSION;
+  document.title = '出勤簿 v' + APP_VERSION;
   const fac = FACILITY_LABELS[staff.facilityId] || staff.facilityId;
   const job = JOB_LABELS[staff.jobType] || staff.jobType;
   $('staffMeta').textContent = `${staff.workType ? staff.workType + '　' : ''}${fac}　${job}`;
