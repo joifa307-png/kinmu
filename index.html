@@ -48,9 +48,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku
 .wheel-outer::before{top:0;background:linear-gradient(to bottom,#fff 30%,rgba(255,255,255,0))}
 .wheel-outer::after{bottom:0;background:linear-gradient(to top,#fff 30%,rgba(255,255,255,0))}
 .wheel-highlight{position:absolute;top:50%;left:2px;right:2px;height:44px;margin-top:-22px;background:#dcefe2;border:1px solid rgba(15,110,86,.25);border-radius:8px;z-index:0;pointer-events:none}
-.wheel{position:relative;z-index:1;height:100%;overflow-y:auto;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;background:transparent}
+.wheel{position:relative;z-index:1;height:100%;overflow-y:scroll;scrollbar-width:none;background:transparent;touch-action:none;overscroll-behavior:contain}
 .wheel::-webkit-scrollbar{display:none}
-.wheel-item{height:44px;display:flex;align-items:center;justify-content:center;font-size:1.05rem;font-weight:600;scroll-snap-align:center;color:#b5aea8;flex-shrink:0;line-height:44px}
+.wheel-item{height:44px;display:flex;align-items:center;justify-content:center;font-size:1.05rem;font-weight:600;scroll-snap-align:center;scroll-snap-stop:always;color:#b5aea8;flex-shrink:0;line-height:44px;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none}
 .wheel-item.sel{color:#0f6e56;font-size:1.25rem;font-weight:700}
 .wheel-item.wheel-pad{visibility:hidden;pointer-events:none}
 .dial-sep{font-size:1.2rem;font-weight:700;padding-top:18px;color:#6b6562}
@@ -306,7 +306,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.2.2';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -648,6 +648,7 @@ function saveSuccessKind(record) {
 
 /* ── ホイール ── */
 const WHEEL_ITEM_H = 44;
+const WHEEL_STEP_PX = WHEEL_ITEM_H * 0.72;
 
 function fillWheel(el, vals, cur, cb) {
   el.innerHTML = '';
@@ -665,8 +666,11 @@ function fillWheel(el, vals, cur, cb) {
   const bottomPad = topPad.cloneNode(true);
   el.appendChild(bottomPad);
 
-  let scrollTimer = null;
   let programmatic = false;
+  let lastEmitted = Number(cur);
+  let touchLastY = 0;
+  let touchAccum = 0;
+  let touching = false;
 
   function indexForVal(val) {
     const idx = vals.indexOf(Number(val));
@@ -691,26 +695,80 @@ function fillWheel(el, vals, cur, cb) {
     return vals[idx];
   }
 
-  function snapTo(val) {
+  function emitChange(val) {
+    if (val === undefined || val === lastEmitted) return;
+    lastEmitted = val;
+    cb(val);
+  }
+
+  function goToIndex(idx, notify) {
+    const clamped = Math.max(0, Math.min(vals.length - 1, idx));
     programmatic = true;
-    el.scrollTop = scrollTopForIndex(indexForVal(val));
-    updateHighlight();
-    requestAnimationFrame(() => { programmatic = false; });
-  }
-
-  function onScrollEnd() {
-    const idx = indexAtCenter();
-    el.scrollTop = scrollTopForIndex(idx);
+    el.scrollTop = scrollTopForIndex(clamped);
     const val = updateHighlight();
-    if (val !== undefined) cb(val);
+    requestAnimationFrame(() => { programmatic = false; });
+    if (notify) emitChange(val);
+    return clamped;
   }
 
-  el.addEventListener('scroll', () => {
-    updateHighlight();
-    if (programmatic) return;
-    clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(onScrollEnd, 120);
+  function stepIndex(delta, notify) {
+    goToIndex(indexAtCenter() + delta, notify);
+  }
+
+  function snapTo(val) {
+    lastEmitted = Number(val);
+    goToIndex(indexForVal(val), false);
+  }
+
+  vals.forEach(v => {
+    const item = el.querySelector(`.wheel-item[data-val="${v}"]`);
+    if (!item) return;
+    item.addEventListener('click', () => {
+      if (programmatic) return;
+      snapTo(v);
+      emitChange(v);
+    });
+  });
+
+  el.addEventListener('touchstart', e => {
+    if (programmatic || e.touches.length !== 1) return;
+    touching = true;
+    touchLastY = e.touches[0].clientY;
+    touchAccum = 0;
   }, { passive: true });
+
+  el.addEventListener('touchmove', e => {
+    if (!touching || programmatic || e.touches.length !== 1) return;
+    e.preventDefault();
+    const y = e.touches[0].clientY;
+    touchAccum += touchLastY - y;
+    touchLastY = y;
+    while (touchAccum >= WHEEL_STEP_PX) {
+      touchAccum -= WHEEL_STEP_PX;
+      stepIndex(1, true);
+    }
+    while (touchAccum <= -WHEEL_STEP_PX) {
+      touchAccum += WHEEL_STEP_PX;
+      stepIndex(-1, true);
+    }
+  }, { passive: false });
+
+  el.addEventListener('touchend', () => {
+    touching = false;
+    touchAccum = 0;
+  }, { passive: true });
+
+  el.addEventListener('touchcancel', () => {
+    touching = false;
+    touchAccum = 0;
+  }, { passive: true });
+
+  el.addEventListener('wheel', e => {
+    if (programmatic) return;
+    e.preventDefault();
+    if (Math.abs(e.deltaY) < 4) return;
+    stepIndex(e.deltaY > 0 ? 1 : -1, true);
+  }, { passive: false });
 
   return { snapTo };
 }
