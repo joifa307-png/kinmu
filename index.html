@@ -64,6 +64,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku
 .chip.active.late{border-color:#0f6e56;background:#dcefe2;color:#0f6e56}
 .chip.active.hol{border-color:#854f0b;background:#faeeda;color:#854f0b}
 .chip.active.sick,.chip.active.other{border-color:#a32d2d;background:#fcebeb;color:#a32d2d}
+.chip.active.ot{border-color:#0f6e56;background:#dcefe2;color:#0f6e56}
 .seg-row{display:flex;border-radius:10px;overflow:hidden;border:2px solid #d8d2ce}
 .seg{flex:1;padding:11px 4px;text-align:center;font-size:.82rem;font-weight:600;background:#fff;cursor:pointer;border:none;color:#37322f;transition:all .15s}
 .seg+.seg{border-left:2px solid #d8d2ce}
@@ -199,6 +200,20 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
     <span class="banner-sub" id="bannerSub">残業 0.0H</span>
   </div>
 
+  <div class="card" id="overtimeReasonCard" style="display:none">
+    <div class="section-label">残業理由（1時間超・必須）</div>
+    <div class="chip-row" id="overtimeReasonRow">
+      <button type="button" class="chip" data-reason="care">利用者対応</button>
+      <button type="button" class="chip" data-reason="records">記録・書類作成</button>
+      <button type="button" class="chip" data-reason="meeting">会議・研修</button>
+      <button type="button" class="chip" data-reason="shortage">人員不足・業務集中</button>
+      <button type="button" class="chip" data-reason="other">その他</button>
+    </div>
+    <div class="reason-block" id="overtimeNoteBlock" style="display:none">
+      <input type="text" id="overtimeNote" placeholder="残業理由（その他の場合は必須）" maxlength="200">
+    </div>
+  </div>
+
   <div class="card">
     <div class="section-label">状態</div>
     <div class="chip-row">
@@ -296,6 +311,7 @@ const MINUTES = [0, 10, 20, 30, 40, 50];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const FACILITY_LABELS = { nishi: 'おひさま西', minami: '南のおひさま', hibari: 'ヘルパーステーションひばり・居宅ひばり', link: '有限会社リンク' };
 const JOB_LABELS = { kaigo: '介護職員', chori: '調理スタッフ', helper: 'ヘルパー（正）', caremane: 'ケアマネージャー', jimu: '事務スタッフ' };
+const OVERTIME_THRESHOLD_MIN = 60;
 
 /* ── マスタ ── */
 const shiftMaster = {
@@ -570,6 +586,8 @@ let lateNote = '';
 let holidayWorkFlag = false;
 let absenceReason = null;
 let absenceNote = '';
+let overtimeReason = null;
+let overtimeNote = '';
 let memo = '';
 let wheelsMounted = false;
 let saving = false;
@@ -807,8 +825,30 @@ function tog(key) {
 function setMode(m) {
   status = m;
   if (m !== 'absence') { absenceReason = null; absenceNote = ''; }
-  if (m !== 'work') hideDials();
+  if (m !== 'work') {
+    hideDials();
+    overtimeReason = null;
+    overtimeNote = '';
+  }
   render();
+}
+
+function setOtReason(r) {
+  overtimeReason = r;
+  if (r !== 'other') overtimeNote = '';
+  render();
+}
+
+function syncOvertimeReasonState(ot) {
+  if (status !== 'work' || ot <= OVERTIME_THRESHOLD_MIN) {
+    overtimeReason = null;
+    overtimeNote = '';
+    if ($('overtimeNote')) $('overtimeNote').value = '';
+  }
+}
+
+function needsOvertimeReason(ot) {
+  return status === 'work' && ot > OVERTIME_THRESHOLD_MIN;
 }
 
 function setAbs(r) {
@@ -827,12 +867,20 @@ function calc() {
 }
 
 function getValidation() {
-  const { short, shiftWorkMin } = calc();
+  const { short, shiftWorkMin, ot } = calc();
   if (status === 'work' && short && !lateFlag) {
     return { ok: false, msg: `所定（${fmtHours(shiftWorkMin)}）より短い勤務です。「遅刻・早退」を選んでください。` };
   }
   if (lateFlag && isEmpty(lateNote)) {
     return { ok: false, msg: '遅刻・早退の理由を入力してください。' };
+  }
+  if (needsOvertimeReason(ot)) {
+    if (!overtimeReason) {
+      return { ok: false, msg: '残業が1時間を超えています。残業理由を選んでください。' };
+    }
+    if (overtimeReason === 'other' && isEmpty(overtimeNote)) {
+      return { ok: false, msg: '「その他」の残業理由を入力してください。' };
+    }
   }
   if (status === 'absence' && !absenceReason) {
     return { ok: false, msg: '欠勤の理由（病欠／その他）を選んでください。' };
@@ -848,6 +896,7 @@ function render() {
 
   const shift = SHIFTS[selShiftIdx];
   const { work, ot } = calc();
+  syncOvertimeReasonState(ot);
   const val = getValidation();
 
   $('dialRange').textContent = `${fmtTime(startMin)} 〜 ${fmtTime(endMin)}`;
@@ -888,6 +937,15 @@ function render() {
   $('chipHol').classList.toggle('active', holidayWorkFlag);
   $('chipHol').classList.toggle('hol', holidayWorkFlag);
   $('lateReasonBlock').style.display = lateFlag ? 'block' : 'none';
+
+  const showOtReason = needsOvertimeReason(ot);
+  $('overtimeReasonCard').style.display = showOtReason ? 'block' : 'none';
+  document.querySelectorAll('#overtimeReasonRow .chip').forEach(btn => {
+    const r = btn.dataset.reason;
+    btn.classList.toggle('active', overtimeReason === r);
+    btn.classList.toggle('ot', overtimeReason === r);
+  });
+  $('overtimeNoteBlock').style.display = showOtReason && overtimeReason === 'other' ? 'block' : 'none';
 
   document.querySelectorAll('#segRow .seg').forEach(btn => {
     const m = btn.dataset.mode;
@@ -943,6 +1001,8 @@ function applyRecord(rec) {
   holidayWorkFlag = !!rec.holidayWorkFlag;
   absenceReason = rec.absenceReason || null;
   absenceNote = rec.absenceNote || '';
+  overtimeReason = rec.overtimeReason || null;
+  overtimeNote = rec.overtimeNote || '';
   memo = rec.memo || '';
 
   if (rec.shiftKey) {
@@ -955,6 +1015,7 @@ function applyRecord(rec) {
 
   $('lateNote').value = lateNote;
   $('absenceNote').value = absenceNote;
+  $('overtimeNote').value = overtimeNote;
   $('memo').value = memo;
 
   buildToggles();
@@ -974,9 +1035,12 @@ function applyDraft(d) {
   holidayWorkFlag = !!d.holidayWorkFlag;
   absenceReason = d.absenceReason || null;
   absenceNote = d.absenceNote || '';
+  overtimeReason = d.overtimeReason || null;
+  overtimeNote = d.overtimeNote || '';
   memo = d.memo || '';
   $('lateNote').value = lateNote;
   $('absenceNote').value = absenceNote;
+  $('overtimeNote').value = overtimeNote;
   $('memo').value = memo;
   buildToggles();
   render();
@@ -992,9 +1056,12 @@ function resetForm() {
   holidayWorkFlag = false;
   absenceReason = null;
   absenceNote = '';
+  overtimeReason = null;
+  overtimeNote = '';
   memo = '';
   $('lateNote').value = '';
   $('absenceNote').value = '';
+  $('overtimeNote').value = '';
   $('memo').value = '';
 
   if (!SHIFTS.length) return;
@@ -1033,6 +1100,8 @@ function buildRecord() {
     holidayWorkFlag,
     absenceReason: status === 'absence' ? absenceReason : null,
     absenceNote: absenceNote.trim(),
+    overtimeReason: needsOvertimeReason(ot) ? overtimeReason : null,
+    overtimeNote: needsOvertimeReason(ot) && overtimeReason === 'other' ? overtimeNote.trim() : '',
     memo: memo.trim(),
     approvalStatus: computeApprovalStatus(currentDate, status, loadedRecord),
     createdBy: staff.staffId,
@@ -1050,12 +1119,13 @@ function saveDraft() {
   if (!staff) return;
   lateNote = $('lateNote').value;
   absenceNote = $('absenceNote').value;
+  overtimeNote = $('overtimeNote').value;
   memo = $('memo').value;
   try {
     localStorage.setItem(draftKey(), JSON.stringify({
       status, selShiftIdx, startMin, endMin, breakMin,
       lateFlag, lateNote, holidayWorkFlag,
-      absenceReason, absenceNote, memo
+      absenceReason, absenceNote, overtimeReason, overtimeNote, memo
     }));
   } catch (_) { /* ignore */ }
 }
@@ -1212,6 +1282,7 @@ async function loadRecordForDate(date) {
 async function submitRecord() {
   lateNote = $('lateNote').value;
   absenceNote = $('absenceNote').value;
+  overtimeNote = $('overtimeNote').value;
   memo = $('memo').value;
 
   const val = getValidation();
@@ -1563,11 +1634,16 @@ function bootApp(staffDef, displayName) {
   $('chipHol').addEventListener('click', () => tog('hol'));
   $('chipSick').addEventListener('click', () => setAbs('sick'));
   $('chipOther').addEventListener('click', () => setAbs('other'));
+  $('overtimeReasonRow').addEventListener('click', e => {
+    const btn = e.target.closest('[data-reason]');
+    if (btn) setOtReason(btn.dataset.reason);
+  });
   document.querySelectorAll('#segRow .seg').forEach(btn => {
     btn.addEventListener('click', () => setMode(btn.dataset.mode));
   });
   $('lateNote').addEventListener('input', () => { lateNote = $('lateNote').value; render(); });
   $('absenceNote').addEventListener('input', () => { absenceNote = $('absenceNote').value; render(); });
+  $('overtimeNote').addEventListener('input', () => { overtimeNote = $('overtimeNote').value; render(); });
   $('memo').addEventListener('input', () => { memo = $('memo').value; render(); });
   $('btnSubmit').addEventListener('click', submitRecord);
   $('btnWithdraw').addEventListener('click', withdrawPaidLeave);
