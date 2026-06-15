@@ -1078,12 +1078,13 @@ function cacheRecord(rec) {
 async function fetchStaffFromGas(staffId) {
   if (!gasConfigured()) return null;
   try {
-    const url = `${GAS_URL}?type=staffOne&staffId=${encodeURIComponent(staffId)}`;
+    const url = `${GAS_URL}?type=staff`;
     const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.ok) return null;
-    return data.staff || null;
+    const staffMap = data.staff || {};
+    return staffMap[staffId] || null;
   } catch (_) {
     return null;
   }
