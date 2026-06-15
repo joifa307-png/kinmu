@@ -50,7 +50,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku
 .wheel-highlight{position:absolute;top:50%;left:2px;right:2px;height:44px;margin-top:-22px;background:#dcefe2;border:1px solid rgba(15,110,86,.25);border-radius:8px;z-index:0;pointer-events:none}
 .wheel{position:relative;z-index:1;height:100%;overflow-y:scroll;scrollbar-width:none;background:transparent;touch-action:none;overscroll-behavior:contain}
 .wheel::-webkit-scrollbar{display:none}
-.wheel-item{height:44px;display:flex;align-items:center;justify-content:center;font-size:1.05rem;font-weight:600;scroll-snap-align:center;scroll-snap-stop:always;color:#b5aea8;flex-shrink:0;line-height:44px;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none}
+.wheel-item{height:44px;display:flex;align-items:center;justify-content:center;font-size:1.05rem;font-weight:600;color:#b5aea8;flex-shrink:0;line-height:44px;-webkit-tap-highlight-color:transparent;user-select:none}
 .wheel-item.sel{color:#0f6e56;font-size:1.25rem;font-weight:700}
 .wheel-item.wheel-pad{visibility:hidden;pointer-events:none}
 .dial-sep{font-size:1.2rem;font-weight:700;padding-top:18px;color:#6b6562}
@@ -306,7 +306,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.2';
+const APP_VERSION = '1.2.3';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -648,7 +648,7 @@ function saveSuccessKind(record) {
 
 /* ── ホイール ── */
 const WHEEL_ITEM_H = 44;
-const WHEEL_STEP_PX = WHEEL_ITEM_H * 0.72;
+const WHEEL_DRAG_RATIO = 0.38;
 
 function fillWheel(el, vals, cur, cb) {
   el.innerHTML = '';
@@ -668,9 +668,8 @@ function fillWheel(el, vals, cur, cb) {
 
   let programmatic = false;
   let lastEmitted = Number(cur);
-  let touchLastY = 0;
-  let touchAccum = 0;
-  let touching = false;
+  let dragLastY = 0;
+  let dragging = false;
 
   function indexForVal(val) {
     const idx = vals.indexOf(Number(val));
@@ -679,6 +678,10 @@ function fillWheel(el, vals, cur, cb) {
 
   function scrollTopForIndex(idx) {
     return Math.max(0, (idx + 1) * WHEEL_ITEM_H - (el.clientHeight - WHEEL_ITEM_H) / 2);
+  }
+
+  function maxScrollTop() {
+    return scrollTopForIndex(vals.length - 1);
   }
 
   function indexAtCenter() {
@@ -711,63 +714,70 @@ function fillWheel(el, vals, cur, cb) {
     return clamped;
   }
 
-  function stepIndex(delta, notify) {
-    goToIndex(indexAtCenter() + delta, notify);
-  }
-
   function snapTo(val) {
     lastEmitted = Number(val);
     goToIndex(indexForVal(val), false);
   }
 
-  vals.forEach(v => {
-    const item = el.querySelector(`.wheel-item[data-val="${v}"]`);
-    if (!item) return;
-    item.addEventListener('click', () => {
-      if (programmatic) return;
-      snapTo(v);
-      emitChange(v);
-    });
-  });
+  function applyDragDelta(dy) {
+    const next = Math.max(0, Math.min(maxScrollTop(), el.scrollTop + dy * WHEEL_DRAG_RATIO));
+    el.scrollTop = next;
+    updateHighlight();
+  }
+
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+    goToIndex(indexAtCenter(), true);
+  }
+
+  function onDragStart(clientY) {
+    if (programmatic) return;
+    dragging = true;
+    dragLastY = clientY;
+  }
+
+  function onDragMove(clientY) {
+    if (!dragging || programmatic) return;
+    const dy = dragLastY - clientY;
+    dragLastY = clientY;
+    applyDragDelta(dy);
+  }
 
   el.addEventListener('touchstart', e => {
     if (programmatic || e.touches.length !== 1) return;
-    touching = true;
-    touchLastY = e.touches[0].clientY;
-    touchAccum = 0;
+    onDragStart(e.touches[0].clientY);
   }, { passive: true });
 
   el.addEventListener('touchmove', e => {
-    if (!touching || programmatic || e.touches.length !== 1) return;
+    if (!dragging || programmatic || e.touches.length !== 1) return;
     e.preventDefault();
-    const y = e.touches[0].clientY;
-    touchAccum += touchLastY - y;
-    touchLastY = y;
-    while (touchAccum >= WHEEL_STEP_PX) {
-      touchAccum -= WHEEL_STEP_PX;
-      stepIndex(1, true);
-    }
-    while (touchAccum <= -WHEEL_STEP_PX) {
-      touchAccum += WHEEL_STEP_PX;
-      stepIndex(-1, true);
-    }
+    onDragMove(e.touches[0].clientY);
   }, { passive: false });
 
-  el.addEventListener('touchend', () => {
-    touching = false;
-    touchAccum = 0;
-  }, { passive: true });
+  el.addEventListener('touchend', () => { endDrag(); }, { passive: true });
+  el.addEventListener('touchcancel', () => { endDrag(); }, { passive: true });
 
-  el.addEventListener('touchcancel', () => {
-    touching = false;
-    touchAccum = 0;
-  }, { passive: true });
+  el.addEventListener('pointerdown', e => {
+    if (programmatic || e.button !== 0) return;
+    onDragStart(e.clientY);
+    try { el.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+  });
+
+  el.addEventListener('pointermove', e => {
+    if (!dragging || programmatic) return;
+    e.preventDefault();
+    onDragMove(e.clientY);
+  });
+
+  el.addEventListener('pointerup', () => { endDrag(); });
+  el.addEventListener('pointercancel', () => { endDrag(); });
 
   el.addEventListener('wheel', e => {
     if (programmatic) return;
     e.preventDefault();
-    if (Math.abs(e.deltaY) < 4) return;
-    stepIndex(e.deltaY > 0 ? 1 : -1, true);
+    applyDragDelta(e.deltaY * 0.15);
+    goToIndex(indexAtCenter(), true);
   }, { passive: false });
 
   return { snapTo };
