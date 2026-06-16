@@ -120,6 +120,8 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 .cal-day:disabled,.cal-day.disabled{color:#d8d2ce;cursor:default}
 .cal-close{width:100%;margin-top:12px;padding:10px;border:2px solid #d8d2ce;border-radius:10px;background:#fff;font-size:.85rem;font-weight:600;color:#37322f;cursor:pointer;font-family:inherit}
 .btn-history-row{display:flex;justify-content:center;margin-top:12px}
+.btn-approval-row{display:flex;justify-content:center;margin-top:8px}
+.chip.chip-approval{border-color:#0f6e56;background:#FCFBFA;color:#0f6e56}
 .history-view{position:fixed;inset:0;background:#eae5e3;z-index:150;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .history-inner{max-width:480px;margin:0 auto;padding:12px 14px 32px}
 .hist-back{background:none;border:none;color:#0f6e56;font-size:.85rem;font-weight:600;padding:4px 0;cursor:pointer;font-family:inherit;margin-bottom:8px}
@@ -258,6 +260,9 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
   <div class="btn-history-row">
     <button type="button" class="chip" id="btnHistory">履歴</button>
   </div>
+  <div class="btn-approval-row" id="approvalJumpRow" style="display:none">
+    <button type="button" class="chip chip-approval" id="btnApprovalJump">有給承認へ →</button>
+  </div>
 </div>
 
 <div id="historyView" class="history-view" style="display:none" aria-hidden="true">
@@ -309,8 +314,9 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.6';
+const APP_VERSION = '1.2.7';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
+const APPROVAL_WOFF_URL = 'https://woff.worksmobile.com/woff/ZxghMBKMmHET8UNXlcVD_A';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -616,6 +622,21 @@ function formatPromptMsg(msg) {
 
 function setWarnMsg(msg) {
   $('warnMsg').textContent = formatPromptMsg(msg);
+}
+
+function updateApprovalJumpButton() {
+  const row = $('approvalJumpRow');
+  if (!row) return;
+  row.style.display = staff && staff.role === 'admin' ? 'flex' : 'none';
+}
+
+function openApprovalApp() {
+  // LINE WORKS内で開かない場合は woff.openWindow に切り替え:
+  // if (typeof woff !== 'undefined' && woff.openWindow) {
+  //   woff.openWindow({ url: APPROVAL_WOFF_URL, external: false });
+  //   return;
+  // }
+  window.location.href = APPROVAL_WOFF_URL;
 }
 
 function mergeSavedRecord(local, remote) {
@@ -1772,6 +1793,7 @@ function bootApp(staffDef, displayName) {
   const fac = FACILITY_LABELS[staff.facilityId] || staff.facilityId;
   const job = JOB_LABELS[staff.jobType] || staff.jobType;
   $('staffMeta').textContent = `${staff.workType ? staff.workType + '　' : ''}${fac}　${job}`;
+  updateApprovalJumpButton();
 
   $('app').style.display = 'block';
   currentDate = todayStr();
@@ -1796,6 +1818,7 @@ function bootApp(staffDef, displayName) {
   $('btnNext').addEventListener('click', () => changeDate(1));
   initCalendar();
   initHistory();
+  $('btnApprovalJump').addEventListener('click', openApprovalApp);
   $('chipHol').addEventListener('click', () => tog('hol'));
   $('lateKindRow').addEventListener('click', e => {
     const btn = e.target.closest('[data-kind]');
