@@ -121,7 +121,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 .cal-close{width:100%;margin-top:12px;padding:10px;border:2px solid #d8d2ce;border-radius:10px;background:#fff;font-size:.85rem;font-weight:600;color:#37322f;cursor:pointer;font-family:inherit}
 .btn-history-row{display:flex;justify-content:center;margin-top:12px}
 .btn-approval-row{display:flex;justify-content:center;margin-top:8px}
-.chip.chip-approval{border-color:#0f6e56;background:#FCFBFA;color:#0f6e56}
+.chip.chip-approval{border-color:#0f6e56;background:#FCFBFA;color:#0f6e56;text-decoration:none;display:inline-block}
 .history-view{position:fixed;inset:0;background:#eae5e3;z-index:150;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .history-inner{max-width:480px;margin:0 auto;padding:12px 14px 32px}
 .hist-back{background:none;border:none;color:#0f6e56;font-size:.85rem;font-weight:600;padding:4px 0;cursor:pointer;font-family:inherit;margin-bottom:8px}
@@ -261,7 +261,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
     <button type="button" class="chip" id="btnHistory">履歴</button>
   </div>
   <div class="btn-approval-row" id="approvalJumpRow" style="display:none">
-    <button type="button" class="chip chip-approval" id="btnApprovalJump">有給承認へ →</button>
+    <a href="https://woff.worksmobile.com/woff/ZxghMBKMmHET8UNXlcVD_A" class="chip chip-approval" id="btnApprovalJump">有給承認へ →</a>
   </div>
 </div>
 
@@ -314,9 +314,8 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.9';
+const APP_VERSION = '1.2.10';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
-const APPROVAL_WOFF_URL = 'https://woff.worksmobile.com/woff/ZxghMBKMmHET8UNXlcVD_A';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -628,14 +627,6 @@ function updateApprovalJumpButton() {
   const row = $('approvalJumpRow');
   if (!row) return;
   row.style.display = staff && staff.role === 'admin' ? 'flex' : 'none';
-}
-
-function openApprovalApp() {
-  if (typeof woff !== 'undefined' && typeof woff.openWindow === 'function') {
-    woff.openWindow({ url: APPROVAL_WOFF_URL, external: true });
-    return;
-  }
-  window.location.href = APPROVAL_WOFF_URL;
 }
 
 function mergeSavedRecord(local, remote) {
@@ -1817,7 +1808,6 @@ function bootApp(staffDef, displayName) {
   $('btnNext').addEventListener('click', () => changeDate(1));
   initCalendar();
   initHistory();
-  $('btnApprovalJump').addEventListener('click', openApprovalApp);
   $('chipHol').addEventListener('click', () => tog('hol'));
   $('lateKindRow').addEventListener('click', e => {
     const btn = e.target.closest('[data-kind]');
