@@ -314,7 +314,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.8';
+const APP_VERSION = '1.2.9';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const APPROVAL_WOFF_URL = 'https://woff.worksmobile.com/woff/ZxghMBKMmHET8UNXlcVD_A';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
@@ -632,7 +632,7 @@ function updateApprovalJumpButton() {
 
 function openApprovalApp() {
   if (typeof woff !== 'undefined' && typeof woff.openWindow === 'function') {
-    woff.openWindow({ url: APPROVAL_WOFF_URL, external: false });
+    woff.openWindow({ url: APPROVAL_WOFF_URL, external: true });
     return;
   }
   window.location.href = APPROVAL_WOFF_URL;
