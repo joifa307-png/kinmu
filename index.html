@@ -102,7 +102,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 .not-reg-status{font-size:.85rem;line-height:1.6;margin-top:14px;min-height:1.4em;text-align:center;color:#0f6e56}
 .not-reg-status.err{color:#ce5242}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2a2522;color:#fff;padding:10px 20px;border-radius:20px;font-size:.85rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100;white-space:pre-line;text-align:center;max-width:calc(100vw - 32px)}
-.toast.toast-farewell{background:#faeeda;color:#854f0b;min-width:17em;padding:16px 36px;font-size:.92rem;line-height:1.65;word-break:keep-all}
+.toast.toast-farewell{top:50%;bottom:auto;transform:translate(-50%,-50%);background:#faeeda;color:#854f0b;min-width:17em;padding:16px 36px;font-size:.92rem;line-height:1.65;word-break:keep-all}
 .toast.show{opacity:1}
 .cal-overlay{position:fixed;inset:0;background:rgba(55,50,47,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
 .cal-modal{background:#fff;border-radius:14px;padding:16px;width:100%;max-width:340px;box-shadow:0 4px 20px rgba(55,50,47,.15)}
@@ -309,7 +309,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.5';
+const APP_VERSION = '1.2.6';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -616,6 +616,15 @@ function formatPromptMsg(msg) {
 
 function setWarnMsg(msg) {
   $('warnMsg').textContent = formatPromptMsg(msg);
+}
+
+function mergeSavedRecord(local, remote) {
+  const saved = { ...local, ...(remote || {}) };
+  ['overtimeReason', 'overtimeNote', 'lateKind', 'lateNote', 'lateFlag'].forEach(key => {
+    if (isEmpty(saved[key]) && !isEmpty(local[key])) saved[key] = local[key];
+  });
+  if (!saved.lateKind && saved.lateFlag) saved.lateKind = local.lateKind || 'late';
+  return saved;
 }
 
 function gasConfigured() {
@@ -997,7 +1006,7 @@ function getValidation() {
       return { ok: false, msg: '遅刻・早退の理由を入力してください。' };
     }
   }
-  if (needsOvertimeReason(ot) && overtimePanelVisible) {
+  if (shouldShowOvertimePanel(ot)) {
     if (!overtimeReason) {
       return { ok: false, msg: '残業が1時間以上です。残業理由を選んでください。' };
     }
@@ -1396,7 +1405,7 @@ async function saveRecordToGas(record) {
       return { ok: false, error: errMsg };
     }
     if (data.ok) {
-      const saved = data.record || record;
+      const saved = mergeSavedRecord(record, data.record || record);
       cacheRecord(saved);
       return { ok: true, record: saved };
     }
@@ -1453,10 +1462,10 @@ async function submitRecord() {
   saving = false;
   if (result.ok) {
     try { localStorage.removeItem(draftKey()); } catch (_) { /* ignore */ }
-    if (result.record) applyRecord(result.record);
-    else hideDials();
     const saved = result.record || record;
+    applyRecord(saved);
     showBriefToast(saveSuccessMessage(saved), saveSuccessKind(saved));
+    setWarnMsg('');
   } else {
     saveDraft();
     setWarnMsg(result.error || '保存できませんでした。通信状況を確認してもう一度お試しください');
@@ -1482,6 +1491,7 @@ async function withdrawPaidLeave() {
     } catch (_) { /* ignore */ }
     resetForm();
     showBriefToast('申請を取り下げました');
+    setWarnMsg('');
   } else {
     setWarnMsg(result.error || '取り下げできませんでした。もう一度お試しください');
   }
