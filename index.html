@@ -120,8 +120,6 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 .cal-day:disabled,.cal-day.disabled{color:#d8d2ce;cursor:default}
 .cal-close{width:100%;margin-top:12px;padding:10px;border:2px solid #d8d2ce;border-radius:10px;background:#fff;font-size:.85rem;font-weight:600;color:#37322f;cursor:pointer;font-family:inherit}
 .btn-history-row{display:flex;justify-content:center;margin-top:12px}
-.btn-approval-row{display:flex;justify-content:center;margin-top:8px}
-.chip.chip-approval{border-color:#0f6e56;background:#FCFBFA;color:#0f6e56;text-decoration:none;display:inline-block}
 .history-view{position:fixed;inset:0;background:#eae5e3;z-index:150;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .history-inner{max-width:480px;margin:0 auto;padding:12px 14px 32px}
 .hist-back{background:none;border:none;color:#0f6e56;font-size:.85rem;font-weight:600;padding:4px 0;cursor:pointer;font-family:inherit;margin-bottom:8px}
@@ -260,9 +258,6 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
   <div class="btn-history-row">
     <button type="button" class="chip" id="btnHistory">履歴</button>
   </div>
-  <div class="btn-approval-row" id="approvalJumpRow" style="display:none">
-    <a href="https://woff.worksmobile.com/woff/ZxghMBKMmHET8UNXlcVD_A" class="chip chip-approval" id="btnApprovalJump">有給承認へ →</a>
-  </div>
 </div>
 
 <div id="historyView" class="history-view" style="display:none" aria-hidden="true">
@@ -314,13 +309,13 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.10';
+const APP_VERSION = '1.2.12';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const FACILITY_LABELS = { nishi: 'おひさま西', minami: '南のおひさま', hibari: 'ヘルパーステーションひばり・居宅ひばり', link: '有限会社リンク' };
-const JOB_LABELS = { kaigo: '介護職員', chori: '調理スタッフ', helper: 'ヘルパー（正）', caremane: 'ケアマネージャー', jimu: '事務スタッフ' };
+const JOB_LABELS = { kaigo: '介護職員', kaigo_toku: '介護職員（特）', chori: '調理スタッフ', helper: 'ヘルパー（正）', caremane: 'ケアマネージャー', jimu: '事務スタッフ' };
 const OVERTIME_THRESHOLD_MIN = 60;
 
 /* ── マスタ ── */
@@ -335,6 +330,7 @@ const shiftMaster = {
   minami_kaigo_hankin: { shiftKey: 'minami_kaigo_hankin', facilityId: 'minami', jobType: 'kaigo',    label: '半勤',  start: 510,  end: 750,  breakMin: 0,   workMin: 240, order: 2, active: true },
   minami_kaigo_chiban: { shiftKey: 'minami_kaigo_chiban', facilityId: 'minami', jobType: 'kaigo',    label: '遅番',  start: 540,  end: 1080, breakMin: 60,  workMin: 480, order: 3, active: true },
   minami_kaigo_yakin:  { shiftKey: 'minami_kaigo_yakin',  facilityId: 'minami', jobType: 'kaigo',    label: '夜勤',  start: 1050, end: 540,  breakMin: 120, workMin: 810, order: 4, active: true },
+  minami_kaigo_tokutei:{ shiftKey: 'minami_kaigo_tokutei',facilityId: 'minami', jobType: 'kaigo_toku',label: '日勤',  start: 510,  end: 990,  breakMin: 60,  workMin: 480, order: 1, active: true },
   minami_chori_a:      { shiftKey: 'minami_chori_a',      facilityId: 'minami', jobType: 'chori',    label: '調理A', start: 390,  end: 810,  breakMin: 60,  workMin: 360, order: 1, active: true },
   minami_chori_b:      { shiftKey: 'minami_chori_b',      facilityId: 'minami', jobType: 'chori',    label: '調理B', start: 810,  end: 1110, breakMin: 0,   workMin: 300, order: 2, active: true },
   hibari_helper_normal:{ shiftKey: 'hibari_helper_normal',facilityId: 'hibari', jobType: 'helper',   label: '通常',  start: 510,  end: 1050, breakMin: 60,  workMin: 480, order: 1, active: true },
@@ -621,12 +617,6 @@ function formatPromptMsg(msg) {
 
 function setWarnMsg(msg) {
   $('warnMsg').textContent = formatPromptMsg(msg);
-}
-
-function updateApprovalJumpButton() {
-  const row = $('approvalJumpRow');
-  if (!row) return;
-  row.style.display = staff && staff.role === 'admin' ? 'flex' : 'none';
 }
 
 function mergeSavedRecord(local, remote) {
@@ -971,8 +961,13 @@ function setLateKind(kind) {
   render();
 }
 
+function isTokuteiLateExempt() {
+  const shift = SHIFTS[selShiftIdx];
+  return !!(shift && shift.shiftKey === 'minami_kaigo_tokutei' && endMin >= 990);
+}
+
 function syncLateReasonState(short) {
-  if (status !== 'work' || !short) {
+  if (!needsLateReason(short)) {
     lateKind = null;
     lateNote = '';
     latePanelVisible = false;
@@ -981,7 +976,7 @@ function syncLateReasonState(short) {
 }
 
 function needsLateReason(short) {
-  return status === 'work' && short;
+  return status === 'work' && short && !isTokuteiLateExempt();
 }
 
 function shouldShowLatePanel(short) {
@@ -1783,7 +1778,6 @@ function bootApp(staffDef, displayName) {
   const fac = FACILITY_LABELS[staff.facilityId] || staff.facilityId;
   const job = JOB_LABELS[staff.jobType] || staff.jobType;
   $('staffMeta').textContent = `${staff.workType ? staff.workType + '　' : ''}${fac}　${job}`;
-  updateApprovalJumpButton();
 
   $('app').style.display = 'block';
   currentDate = todayStr();
