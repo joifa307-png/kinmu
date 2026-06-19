@@ -14,8 +14,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku
 .card{background:#FCFBFA;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(55,50,47,.06)}
 .name-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(55,50,47,.08)}
 .name-card-head{display:flex;justify-content:space-between;align-items:flex-end;gap:8px;margin-bottom:4px}
-.app-version{font-size:.4rem;color:#d0cbc7;font-weight:400;flex-shrink:0;text-align:right;line-height:1;padding-bottom:2px}
-.name-card .staff-name{font-size:1.25rem;font-weight:700;margin-bottom:0;flex:1;min-width:0}
+.app-version{font-size:.52rem;color:#d0cbc7;font-weight:400;flex-shrink:0;text-align:right;line-height:1;padding-bottom:2px}
+.name-card .staff-name{font-size:1.1rem;font-weight:700;margin-bottom:0;flex:1;min-width:0}
 .name-card .staff-meta{font-size:.85rem;color:#6b6562;margin-bottom:12px}
 .date-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:10px;border-top:1px solid #ece8e5}
 .date-nav button{background:none;border:none;font-size:1.4rem;color:#0f6e56;padding:4px 12px;cursor:pointer;line-height:1}
@@ -1774,7 +1774,7 @@ function bootApp(staffDef, displayName) {
 
   $('staffName').textContent = staff.name || displayName || '';
   $('appVersion').textContent = 'v' + APP_VERSION;
-  document.title = '出勤簿 v' + APP_VERSION;
+  document.title = '出勤簿';
   const fac = FACILITY_LABELS[staff.facilityId] || staff.facilityId;
   const job = JOB_LABELS[staff.jobType] || staff.jobType;
   $('staffMeta').textContent = `${staff.workType ? staff.workType + '　' : ''}${fac}　${job}`;
