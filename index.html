@@ -44,17 +44,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku
 .dial-row{display:flex;align-items:center;justify-content:center;gap:4px}
 .dial-col{flex:1;max-width:72px}
 .dial-label{text-align:center;font-size:.7rem;color:#6b6562;margin-bottom:4px}
-.wheel-outer{position:relative;height:140px;overflow:hidden;border-radius:10px;background:#fff;border:1px solid #e8e4e1}
-.wheel-outer::before,.wheel-outer::after{content:"";position:absolute;left:0;right:0;height:40px;z-index:2;pointer-events:none}
+.wheel-outer{position:relative;height:210px;overflow:hidden;border-radius:10px;background:#fff;border:1px solid #e8e4e1}
+.wheel-outer::before,.wheel-outer::after{content:"";position:absolute;left:0;right:0;height:60px;z-index:2;pointer-events:none}
 .wheel-outer::before{top:0;background:linear-gradient(to bottom,#fff 30%,rgba(255,255,255,0))}
 .wheel-outer::after{bottom:0;background:linear-gradient(to top,#fff 30%,rgba(255,255,255,0))}
-.wheel-highlight{position:absolute;top:50%;left:2px;right:2px;height:44px;margin-top:-22px;background:#dcefe2;border:1px solid rgba(15,110,86,.25);border-radius:8px;z-index:0;pointer-events:none}
+.wheel-highlight{position:absolute;top:50%;left:2px;right:2px;height:66px;margin-top:-33px;background:#dcefe2;border:1px solid rgba(15,110,86,.25);border-radius:8px;z-index:0;pointer-events:none}
 .wheel{position:relative;z-index:1;height:100%;overflow-y:scroll;scrollbar-width:none;background:transparent;touch-action:none;overscroll-behavior:contain}
 .wheel::-webkit-scrollbar{display:none}
-.wheel-item{height:44px;display:flex;align-items:center;justify-content:center;font-size:1.05rem;font-weight:600;color:#b5aea8;flex-shrink:0;line-height:44px;-webkit-tap-highlight-color:transparent;user-select:none}
-.wheel-item.sel{color:#0f6e56;font-size:1.25rem;font-weight:700}
+.wheel-item{height:66px;display:flex;align-items:center;justify-content:center;font-size:1.15rem;font-weight:600;color:#b5aea8;flex-shrink:0;line-height:66px;-webkit-tap-highlight-color:transparent;user-select:none}
+.wheel-item.sel{color:#0f6e56;font-size:1.35rem;font-weight:700}
 .wheel-item.wheel-pad{visibility:hidden;pointer-events:none}
-.dial-sep{font-size:1.2rem;font-weight:700;padding-top:18px;color:#6b6562}
+.dial-sep{font-size:1.2rem;font-weight:700;padding-top:27px;color:#6b6562}
 .banner{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-radius:12px;margin-bottom:12px;font-weight:600}
 .banner.work{background:#dcefe2;color:#0f6e56}
 .banner.holiday{background:#faeeda;color:#854f0b}
@@ -309,7 +309,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.12';
+const APP_VERSION = '1.2.13';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -670,8 +670,8 @@ function saveSuccessKind(record) {
 }
 
 /* ── ホイール ── */
-const WHEEL_ITEM_H = 44;
-const WHEEL_DRAG_RATIO = 0.38;
+const WHEEL_ITEM_H = 66;
+const WHEEL_DRAG_RATIO = 0.28;
 
 function fillWheel(el, vals, cur, cb) {
   el.innerHTML = '';
@@ -799,7 +799,7 @@ function fillWheel(el, vals, cur, cb) {
   el.addEventListener('wheel', e => {
     if (programmatic) return;
     e.preventDefault();
-    applyDragDelta(e.deltaY * 0.15);
+    applyDragDelta(e.deltaY * 0.12);
     goToIndex(indexAtCenter(), true);
   }, { passive: false });
 
