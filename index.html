@@ -348,7 +348,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.14';
+const APP_VERSION = '1.2.15';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -2028,187 +2028,201 @@ const GUIDE_PAGES = [
 
   // ---- ページ3：こんなときは ----
   `<div style="max-width:480px; margin:0 auto;">
-    <h2 style="text-align:center; font-size:20px; color:#0f6e56; margin:0 0 14px;">
+    <h2 style="text-align:center; font-size:22px; color:#0f6e56; margin:0 0 16px;">
       こんなときは
     </h2>
 
     <!-- 時間を直したいとき -->
-    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:12px;">
+    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:14px;">
       <div style="background:#0f6e56; color:#fff; text-align:center;
-                  padding:9px; font-size:15px; font-weight:bold;">
+                  padding:11px; font-size:17px; font-weight:bold;">
         時間を直したいとき
       </div>
-      <div style="padding:12px 14px; background:#fff; font-size:14px; line-height:1.7;">
-        シフトを選ぶと標準の時間が自動で入ります。<br>
-        違うときは<span style="color:#c0392b; font-weight:bold;">「変更」</span>→表示された時刻ダイヤルを上下で合わせて
+      <div style="padding:14px 16px; background:#fff; font-size:16px; line-height:1.75;">
+        シフトを選ぶと、<br>
+        標準の時間が自動で入ります。<br>
+        違うときは<span style="color:#c0392b; font-weight:bold;">「変更」</span>→<br>
+        表示された時刻ダイヤルを上下で合わせて、<br>
         <span style="color:#c0392b; font-weight:bold;">「確定」</span>
-        <div style="display:flex; gap:8px; margin-top:10px; align-items:center; font-size:16px;">
-          <div style="border:1px solid #999; border-radius:6px; padding:6px 14px; background:#f5f5f5; font-weight:bold;">08</div>
-          <div style="border:1px solid #999; border-radius:6px; padding:6px 14px; background:#f5f5f5; font-weight:bold;">30</div>
+        <div style="display:flex; gap:8px; margin-top:12px; align-items:center; font-size:18px;">
+          <div style="border:1px solid #999; border-radius:6px; padding:7px 14px; background:#f5f5f5; font-weight:bold;">08</div>
+          <div style="border:1px solid #999; border-radius:6px; padding:7px 14px; background:#f5f5f5; font-weight:bold;">30</div>
           <span>〜</span>
-          <div style="border:1px solid #999; border-radius:6px; padding:6px 14px; background:#f5f5f5; font-weight:bold;">18</div>
-          <div style="border:1px solid #999; border-radius:6px; padding:6px 14px; background:#f5f5f5; font-weight:bold;">00</div>
+          <div style="border:1px solid #999; border-radius:6px; padding:7px 14px; background:#f5f5f5; font-weight:bold;">18</div>
+          <div style="border:1px solid #999; border-radius:6px; padding:7px 14px; background:#f5f5f5; font-weight:bold;">00</div>
         </div>
       </div>
     </div>
 
     <!-- 早く退社した日・遅刻した日 -->
-    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:12px;">
+    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:14px;">
       <div style="background:#0f6e56; color:#fff; text-align:center;
-                  padding:9px; font-size:15px; font-weight:bold;">
+                  padding:11px; font-size:17px; font-weight:bold;">
         早く退社した日・遅刻した日
       </div>
-      <div style="padding:12px 14px; background:#fff; font-size:14px; line-height:1.7;">
-        所定時間より短いとパネルが出ます。<br>
-        「遅刻」か「早退」を選んで理由を入力。
-        <div style="display:flex; gap:8px; margin-top:10px;">
-          <div style="border:2px solid #0f6e56; border-radius:8px; padding:7px 20px;
-                      font-size:14px; font-weight:bold; color:#0f6e56;">遅刻</div>
-          <div style="border:1px solid #ccc; border-radius:8px; padding:7px 20px;
-                      font-size:14px; color:#666;">早退</div>
+      <div style="padding:14px 16px; background:#fff; font-size:16px; line-height:1.75;">
+        所定時間より短いと、パネルが出ます。<br>
+        「遅刻」か「早退」を選んで、理由を入力。
+        <div style="display:flex; gap:8px; margin-top:12px;">
+          <div style="border:2px solid #0f6e56; border-radius:8px; padding:8px 22px;
+                      font-size:16px; font-weight:bold; color:#0f6e56;">遅刻</div>
+          <div style="border:1px solid #ccc; border-radius:8px; padding:8px 22px;
+                      font-size:16px; color:#666;">早退</div>
         </div>
       </div>
     </div>
 
     <!-- 残業が1時間以上のとき -->
-    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:12px;">
+    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:14px;">
       <div style="background:#0f6e56; color:#fff; text-align:center;
-                  padding:9px; font-size:15px; font-weight:bold;">
+                  padding:11px; font-size:17px; font-weight:bold;">
         残業が１時間以上のとき
       </div>
-      <div style="padding:12px 14px; background:#fff; font-size:14px; line-height:1.7;">
+      <div style="padding:14px 16px; background:#fff; font-size:16px; line-height:1.75;">
         「残業理由」のパネルが出ます。<br>
-        あてはまるものを選んでから登録してください。
-        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-top:10px;">
-          <div style="border:1px solid #bbb; border-radius:6px; padding:6px;
-                      text-align:center; font-size:13px; color:#0f6e56;">利用者対応</div>
-          <div style="border:1px solid #bbb; border-radius:6px; padding:6px;
-                      text-align:center; font-size:13px; color:#0f6e56;">記録・書類</div>
-          <div style="border:1px solid #bbb; border-radius:6px; padding:6px;
-                      text-align:center; font-size:13px; color:#0f6e56;">その他</div>
-          <div style="border:1px solid #bbb; border-radius:6px; padding:6px;
-                      text-align:center; font-size:13px; color:#0f6e56;">会議・研修</div>
-          <div style="border:1px solid #bbb; border-radius:6px; padding:6px;
-                      text-align:center; font-size:13px; color:#0f6e56;">人員不足</div>
+        あてはまるものを選んでから、登録してください。
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:12px;">
+          <div style="border:1px solid #bbb; border-radius:6px; padding:8px 4px;
+                      text-align:center; font-size:15px; color:#0f6e56;">利用者対応</div>
+          <div style="border:1px solid #bbb; border-radius:6px; padding:8px 4px;
+                      text-align:center; font-size:15px; color:#0f6e56;">記録・書類</div>
+          <div style="border:1px solid #bbb; border-radius:6px; padding:8px 4px;
+                      text-align:center; font-size:15px; color:#0f6e56;">その他</div>
+          <div style="border:1px solid #bbb; border-radius:6px; padding:8px 4px;
+                      text-align:center; font-size:15px; color:#0f6e56;">会議・研修</div>
+          <div style="border:1px solid #bbb; border-radius:6px; padding:8px 4px;
+                      text-align:center; font-size:15px; color:#0f6e56;">人員不足</div>
         </div>
       </div>
     </div>
 
     <!-- 休みの日に出たとき（休日出勤） -->
-    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:12px;">
+    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:14px;">
       <div style="background:#7a5c2e; color:#fff; text-align:center;
-                  padding:9px; font-size:15px; font-weight:bold;">
+                  padding:11px; font-size:17px; font-weight:bold;">
         休みの日に出たとき（休日出勤）
       </div>
-      <div style="padding:12px 14px; background:#fff; font-size:14px; line-height:1.7;">
-        シフトを選んで、登録する前に
-        <span style="border:1px solid #0f6e56; border-radius:6px; padding:2px 8px;
-                     color:#0f6e56; font-size:13px;">休日出勤</span>
+      <div style="padding:14px 16px; background:#fff; font-size:16px; line-height:1.75;">
+        シフトを選んで、<br>
+        登録する前に
+        <span style="border:1px solid #0f6e56; border-radius:6px; padding:3px 10px;
+                     color:#0f6e56; font-size:15px;">休日出勤</span>
         ボタンを押してください<br>
         <span style="font-weight:bold;">忘れずに！</span>
       </div>
     </div>
 
     <!-- 有給の申請 -->
-    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:16px;">
+    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:18px;">
       <div style="background:#0f6e56; color:#fff; text-align:center;
-                  padding:9px; font-size:15px; font-weight:bold;">
+                  padding:11px; font-size:17px; font-weight:bold;">
         有給の申請
       </div>
-      <div style="padding:12px 14px; background:#fff; font-size:14px; line-height:1.7;">
+      <div style="padding:14px 16px; background:#fff; font-size:16px; line-height:1.75;">
         <span style="color:#0f6e56; font-weight:bold;">申請の流れ</span><br>
         ① 日付に移動 → ② 区分で「有給」→ ③「登録する」<br>
-        上長が承認すると「有給（承認済み）」で確定。残数に自動反映。
+        上長が承認すると「有給（承認済み）」で確定。<br>
+        残数に自動反映。
       </div>
     </div>
 
     <!-- 注意バナー -->
-    <div style="text-align:center; font-size:15px; font-weight:bold;
-                color:#0f6e56; margin-bottom:6px;">
-      その操作も最後に必ず【登録する】を押して下さい。
+    <div style="text-align:center; font-size:17px; font-weight:bold;
+                color:#0f6e56; margin-bottom:8px; line-height:1.75;">
+      その操作も最後に、<br>
+      必ず【登録する】を押して下さい。
     </div>
-    <div style="text-align:center; font-size:14px; font-weight:bold; color:#c0392b;">
-      「登録しました。」のメッセージが出るか確認を！
+    <div style="text-align:center; font-size:16px; font-weight:bold; color:#c0392b; line-height:1.75;">
+      「登録しました。」のメッセージが出るか、<br>
+      確認を！
     </div>
   </div>`,
 
 
   // ---- ページ4：履歴の見かた / よくある質問 ----
   `<div style="max-width:480px; margin:0 auto;">
-    <h2 style="text-align:center; font-size:20px; color:#0f6e56; margin:0 0 14px;">
+    <h2 style="text-align:center; font-size:22px; color:#0f6e56; margin:0 0 16px;">
       履歴の見かた　／　よくある質問
     </h2>
 
     <!-- 自分の勤務記録を確認するには -->
-    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:18px;">
+    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:20px;">
       <div style="background:#0f6e56; color:#fff; text-align:center;
-                  padding:9px; font-size:14px; font-weight:bold;">
+                  padding:11px; font-size:16px; font-weight:bold;">
         自分の勤務記録を確認するには
       </div>
-      <div style="padding:12px 14px; background:#fff; font-size:14px; line-height:1.7;">
-        画面の下にある「履歴」ボタンを押すと、当月と前月の勤務一覧が表示されます。
-        「＜ ＞」で月度を切り替えられます（11日〜翌月10日が1か月分）。
-        <div style="margin-top:12px; display:flex; align-items:center; gap:12px;">
+      <div style="padding:14px 16px; background:#fff; font-size:16px; line-height:1.75;">
+        画面の下にある「履歴」ボタンを押すと、<br>
+        当月と前月の勤務一覧が表示されます。<br>
+        「＜ ＞」で月度を切り替えられます<br>
+        （11日〜翌月10日が1か月分）。
+        <div style="margin-top:14px; text-align:center;">
           <div style="background:#222; color:#fff; border-radius:8px;
-                      padding:8px 18px; font-size:14px; font-weight:bold;">登録する</div>
-          <div style="border:1px solid #ccc; border-radius:6px; padding:6px 16px;
-                      font-size:14px; color:#0f6e56;">履歴</div>
-          <span style="color:#c0392b; font-weight:bold; font-size:13px;">← このボタンを押す</span>
+                      padding:12px; font-size:16px; font-weight:bold; margin-bottom:12px;">登録する</div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+            <div style="border:1px solid #ccc; border-radius:20px; padding:8px 24px;
+                        font-size:16px; color:#0f6e56; font-weight:600;">履歴</div>
+            <span style="color:#c0392b; font-weight:bold; font-size:15px;">← このボタンを押す</span>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- よくある質問 -->
-    <div style="font-size:16px; font-weight:bold; color:#0f6e56; margin-bottom:10px;">
+    <div style="font-size:18px; font-weight:bold; color:#0f6e56; margin-bottom:12px;">
       よくある質問
     </div>
 
     <!-- Q1 -->
-    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:10px;">
-      <div style="background:#e8f5ee; padding:10px 14px;
-                  font-size:14px; font-weight:bold; color:#0f6e56;">
+    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:12px;">
+      <div style="background:#e8f5ee; padding:12px 16px;
+                  font-size:16px; font-weight:bold; color:#0f6e56;">
         Q　ホーム画面から「出勤簿」マークが消えた…
       </div>
-      <div style="padding:10px 14px; background:#fff; font-size:14px; line-height:1.7;">
-        A　起動中のアプリ一覧から LINE WORKS を上へスワイプして、その後再起動。<br>
-        <span style="padding-left:1em; font-size:13px; color:#555;">（開き直して最初に「LINK」と出れば、復活します）</span>
+      <div style="padding:12px 16px; background:#fff; font-size:16px; line-height:1.75;">
+        A　起動中のアプリ一覧から LINE WORKS を上へスワイプして、<br>
+        その後再起動。<br>
+        <span style="padding-left:1em; font-size:15px; color:#555;">（開き直して最初に「LINK」と出れば、復活します）</span>
       </div>
     </div>
 
     <!-- Q2 -->
-    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:10px;">
-      <div style="background:#e8f5ee; padding:10px 14px;
-                  font-size:14px; font-weight:bold; color:#0f6e56;">
+    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:12px;">
+      <div style="background:#e8f5ee; padding:12px 16px;
+                  font-size:16px; font-weight:bold; color:#0f6e56;">
         Q　間違えて登録してしまった
       </div>
-      <div style="padding:10px 14px; background:#fff; font-size:14px; line-height:1.7;">
-        A　同じ日をもう一度開いて、正しい内容で「登録する」を押し直してください。<br>
+      <div style="padding:12px 16px; background:#fff; font-size:16px; line-height:1.75;">
+        A　同じ日をもう一度開いて、<br>
+        正しい内容で「登録する」を押し直してください。<br>
         上書きされます。
       </div>
     </div>
 
     <!-- Q3 -->
-    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:10px;">
-      <div style="background:#e8f5ee; padding:10px 14px;
-                  font-size:14px; font-weight:bold; color:#0f6e56;">
+    <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:12px;">
+      <div style="background:#e8f5ee; padding:12px 16px;
+                  font-size:16px; font-weight:bold; color:#0f6e56;">
         Q　昨日（前の日）の入力を忘れた
       </div>
-      <div style="padding:10px 14px; background:#fff; font-size:14px; line-height:1.7;">
-        A　「＜」ボタンで過去の日付に戻って入力できます。
+      <div style="padding:12px 16px; background:#fff; font-size:16px; line-height:1.75;">
+        A　「＜」ボタンで、<br>
+        過去の日付に戻って入力できます。
       </div>
     </div>
 
     <!-- Q4 -->
     <div style="border:1px solid #bbb; border-radius:10px; overflow:hidden; margin-bottom:16px;">
-      <div style="background:#e8f5ee; padding:10px 14px;
-                  font-size:14px; font-weight:bold; color:#0f6e56;">
+      <div style="background:#e8f5ee; padding:12px 16px;
+                  font-size:16px; font-weight:bold; color:#0f6e56;">
         Q　欠勤と公休、振替の違いは？
       </div>
-      <div style="padding:10px 14px; background:#fff; font-size:14px; line-height:1.7;">
-        A　あらかじめシフトで決まっている公休日や、事前に勤務と振り替えた
-        休日は<span style="font-weight:bold;">入力不要</span>です。<br><br>
+      <div style="padding:12px 16px; background:#fff; font-size:16px; line-height:1.75;">
+        A　あらかじめシフトで決まっている公休日や、<br>
+        事前に勤務と振り替えた休日は<span style="font-weight:bold;">入力不要</span>です。<br><br>
         <span style="color:#c0392b;">
-          出勤予定日に急な欠勤（－１日）となった場合のみ「欠勤」を押します。
+          出勤予定日に急な欠勤（－１日）となった場合のみ、<br>
+          「欠勤」を押します。
         </span>
       </div>
     </div>
