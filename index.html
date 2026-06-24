@@ -88,6 +88,8 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 .btn-submit:disabled{opacity:.4;cursor:default}
 .btn-withdraw{width:100%;padding:12px;border:2px solid #854f0b;border-radius:12px;background:#fff;color:#854f0b;font-size:.9rem;font-weight:700;cursor:pointer;margin-top:8px;font-family:inherit;transition:opacity .15s}
 .btn-withdraw:disabled{opacity:.4;cursor:default}
+.btn-delete-record{width:100%;padding:12px;border:2px solid #a32d2d;border-radius:12px;background:#fff;color:#a32d2d;font-size:.85rem;font-weight:700;cursor:pointer;margin-top:8px;font-family:inherit;transition:opacity .15s}
+.btn-delete-record:disabled{opacity:.4;cursor:default}
 .approval-label{font-size:.78rem;font-weight:700;margin-top:10px;padding:6px 12px;border-radius:8px;display:inline-block}
 .approval-label.pending{background:#faeeda;color:#854f0b}
 .approval-label.approved{background:#e6f1fb;color:#185fa5}
@@ -260,6 +262,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
   <div class="warn" id="warnMsg"></div>
   <button type="button" class="btn-submit" id="btnSubmit">登録する</button>
   <button type="button" class="btn-withdraw" id="btnWithdraw" style="display:none">申請を取り下げる</button>
+  <button type="button" class="btn-delete-record" id="btnDeleteRecord" style="display:none">この日の記録を削除する</button>
   <div class="btn-history-row">
     <button type="button" class="chip" id="btnHistory">履歴</button>
   </div>
@@ -348,7 +351,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.17';
+const APP_VERSION = '1.2.18';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -637,6 +640,7 @@ let memo = '';
 let wheelsMounted = false;
 let saving = false;
 let withdrawing = false;
+let deleting = false;
 let loadedRecord = null;
 let dialsLocked = true;
 let dialsVisible = false;
@@ -1161,11 +1165,16 @@ function render() {
 
   const showWithdraw = isSavedPendingPaidLeave();
   $('btnWithdraw').style.display = showWithdraw ? 'block' : 'none';
-  $('btnWithdraw').disabled = withdrawing || saving;
+  $('btnWithdraw').disabled = withdrawing || saving || deleting;
   $('btnWithdraw').textContent = withdrawing ? '取り下げ中…' : '申請を取り下げる';
 
+  const showDelete = canDeleteCurrentRecord();
+  $('btnDeleteRecord').style.display = showDelete ? 'block' : 'none';
+  $('btnDeleteRecord').disabled = deleting || saving || withdrawing;
+  $('btnDeleteRecord').textContent = deleting ? '削除中…' : 'この日の記録を削除する';
+
   setWarnMsg(val.msg);
-  $('btnSubmit').disabled = !val.ok || saving || withdrawing;
+  $('btnSubmit').disabled = !val.ok || saving || withdrawing || deleting;
   $('btnSubmit').textContent = saving ? '送信中…' : '登録する';
 
   applyDialLockUI();
@@ -1351,6 +1360,86 @@ function cacheRecord(rec) {
   try {
     localStorage.setItem(`kinmu_record_${recordKey(rec.date, rec.staffId)}`, JSON.stringify(rec));
   } catch (_) { /* ignore */ }
+}
+
+function removeCachedRecord(date, staffId) {
+  try {
+    localStorage.removeItem(`kinmu_record_${recordKey(date, staffId)}`);
+    localStorage.removeItem(`kinmu_draft_${staffId}_${date}`);
+  } catch (_) { /* ignore */ }
+}
+
+function canDeleteCurrentRecord() {
+  if (!gasConfigured() || !loadedRecord || !staff) return false;
+  const st = loadedRecord.status || 'work';
+  return st === 'work' || st === 'absence';
+}
+
+function formatDeleteError(msg) {
+  const m = String(msg || '').trim();
+  if (!m) return 'この記録は削除できません。';
+  if (/承認済|approved|有給.*削除/i.test(m)) return m;
+  if (m.includes('paid_leave') || m.includes('approvalStatus')) {
+    return '承認済みの有給は削除できません。';
+  }
+  return m;
+}
+
+const DELETE_RECORD_TIMEOUT_MS = 8000;
+const DELETE_RECORD_MAX_RETRIES = 3;
+
+async function deleteRecordToGas(date, staffId) {
+  const networkErr = '通信が不安定でした。少し待って、画面を再読込して確認してください。';
+  if (!gasConfigured()) {
+    return { ok: false, error: '削除できませんでした。設定を確認してください。' };
+  }
+  const payload = { type: 'recordDelete', date, staffId };
+
+  for (let attempt = 0; attempt < DELETE_RECORD_MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), DELETE_RECORD_TIMEOUT_MS);
+    try {
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+
+      if (!res.ok) {
+        if (attempt < DELETE_RECORD_MAX_RETRIES - 1) continue;
+        return { ok: false, error: networkErr, network: true };
+      }
+
+      let data;
+      try {
+        data = JSON.parse(await res.text());
+      } catch (_) {
+        if (attempt < DELETE_RECORD_MAX_RETRIES - 1) continue;
+        return { ok: false, error: networkErr, network: true };
+      }
+
+      if (!data || typeof data.ok !== 'boolean') {
+        if (attempt < DELETE_RECORD_MAX_RETRIES - 1) continue;
+        return { ok: false, error: networkErr, network: true };
+      }
+
+      if (data.ok) {
+        return {
+          ok: true,
+          deleted: data.result ? data.result.deleted : null,
+          note: data.result ? data.result.note : undefined
+        };
+      }
+      return { ok: false, error: formatDeleteError(data.error) };
+    } catch (_) {
+      clearTimeout(timer);
+      if (attempt < DELETE_RECORD_MAX_RETRIES - 1) continue;
+      return { ok: false, error: networkErr, network: true };
+    }
+  }
+  return { ok: false, error: networkErr, network: true };
 }
 
 /* ── GAS 同期 ── */
@@ -1539,6 +1628,34 @@ async function withdrawPaidLeave() {
     setWarnMsg('');
   } else {
     setWarnMsg(result.error || '取り下げできませんでした。もう一度お試しください');
+  }
+  render();
+}
+
+async function deleteCurrentRecord() {
+  if (!canDeleteCurrentRecord() || deleting || saving || withdrawing) return;
+  const msg = 'この日の記録を削除すると元に戻せません。\nこの日を公休（空白）に戻します。よろしいですか?';
+  if (!confirm(msg)) return;
+
+  deleting = true;
+  setWarnMsg('');
+  render();
+
+  const result = await deleteRecordToGas(currentDate, staff.staffId);
+
+  deleting = false;
+
+  if (result.ok) {
+    removeCachedRecord(currentDate, staff.staffId);
+    resetForm();
+    if (result.deleted) {
+      showBriefToast('記録を削除しました。');
+    } else {
+      showBriefToast('この日の記録はありませんでした。');
+    }
+    setWarnMsg('');
+  } else {
+    setWarnMsg(result.error || '削除できませんでした。');
   }
   render();
 }
@@ -1861,6 +1978,7 @@ function bootApp(staffDef, displayName) {
   $('memo').addEventListener('input', () => { memo = $('memo').value; render(); });
   $('btnSubmit').addEventListener('click', submitRecord);
   $('btnWithdraw').addEventListener('click', withdrawPaidLeave);
+  $('btnDeleteRecord').addEventListener('click', deleteCurrentRecord);
   $('btnDialEdit').addEventListener('click', toggleDialEdit);
   hideDials();
 }
@@ -2221,7 +2339,7 @@ const GUIDE_PAGES = [
         Q　休日出勤ボタンはどんな時使うの？
       </div>
       <div style="padding:12px 16px; background:#fff; font-size:16px; line-height:1.75;">
-        A　シフト上の公休日に勤務し、予定よりも勤務日数が増えた場合に押してください。手当が増額されます。振替勤務は含みません。
+        A　シフト上の公休日に勤務し、予定よりも勤務日数が増えた場合に押してください。手当が増額されます。振り替休日は含みません。
       </div>
     </div>
 
@@ -2232,7 +2350,7 @@ const GUIDE_PAGES = [
         Q　特記事項はどんな時に記入すると？
       </div>
       <div style="padding:12px 16px; background:#fff; font-size:16px; line-height:1.75;">
-        A　休憩30分しか取れなかった等、入力項目にない不規則なパターンの場合や判断に迷う時などに記入して下さい。有給申請の時に添えるメッセージなどにも。
+        A　休憩30分しか取れなかった等、アプリ内で表現できないイレギュラーな場合や判断に迷う時などに記入して下さい。
       </div>
     </div>
 
