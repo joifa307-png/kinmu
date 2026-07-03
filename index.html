@@ -353,7 +353,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.20';
+const APP_VERSION = '1.2.21';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -569,6 +569,13 @@ function recordKey(date, staffId) {
 
 function hasMinamiKenmuWorkType(workType) {
   return String(workType || '').includes('兼務-minami');
+}
+
+function workTypeForDisplay(workType) {
+  return String(workType || '')
+    .replace(/兼務-minami/g, '')
+    .replace(/[　\s]+/g, ' ')
+    .trim();
 }
 
 function isMinamiKenmuExtraShift(shift) {
@@ -1972,7 +1979,8 @@ function bootApp(staffDef, displayName) {
   document.title = '出勤簿';
   const fac = FACILITY_LABELS[staff.facilityId] || staff.facilityId;
   const job = JOB_LABELS[staff.jobType] || staff.jobType;
-  $('staffMeta').textContent = `${staff.workType ? staff.workType + '　' : ''}${fac}　${job}`;
+  const wt = workTypeForDisplay(staff.workType);
+  $('staffMeta').textContent = `${wt ? wt + '　' : ''}${fac}　${job}`;
 
   $('app').style.display = 'block';
   currentDate = todayStr();
