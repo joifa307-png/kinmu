@@ -353,7 +353,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.21';
+const APP_VERSION = '1.2.22';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -592,6 +592,30 @@ function shiftToggleLabel(shift) {
   if (shift.shiftKey === 'minami_chori_a') return '南調理A';
   if (shift.shiftKey === 'minami_chori_b') return '南調理B';
   return shift.label;
+}
+
+const MINAMI_KENMU_MEMO = '南勤務';
+
+function syncMinamiKenmuMemo() {
+  if (!staff || !SHIFTS.length || status !== 'work') return;
+  const shift = SHIFTS[selShiftIdx];
+  const el = $('memo');
+  if (!el) return;
+  let current = el.value;
+
+  if (isMinamiKenmuExtraShift(shift)) {
+    if (!current.includes(MINAMI_KENMU_MEMO)) {
+      const trimmed = current.trim();
+      current = trimmed ? `${MINAMI_KENMU_MEMO}　${trimmed}` : MINAMI_KENMU_MEMO;
+    }
+  } else if (current === MINAMI_KENMU_MEMO) {
+    current = '';
+  } else if (current.startsWith(MINAMI_KENMU_MEMO + '　')) {
+    current = current.slice(MINAMI_KENMU_MEMO.length + 1).trim();
+  }
+
+  el.value = current;
+  memo = current;
 }
 
 function shiftKeysForStaff(staffRef) {
@@ -1001,6 +1025,7 @@ function selShift(i) {
   overtimePanelVisible = false;
   latePanelVisible = false;
   hideDials();
+  syncMinamiKenmuMemo();
   buildToggles();
   render();
   mountDials();
@@ -1270,6 +1295,7 @@ function applyRecord(rec) {
     overtimePanelVisible = false;
     latePanelVisible = false;
   }
+  syncMinamiKenmuMemo();
   render();
   mountDials();
 }
@@ -1305,6 +1331,7 @@ function applyDraft(d) {
     overtimePanelVisible = false;
     latePanelVisible = false;
   }
+  syncMinamiKenmuMemo();
   render();
   mountDials();
 }
