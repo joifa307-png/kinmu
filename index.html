@@ -28,6 +28,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku
 .shift-toggles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .shift-toggle{border:2px solid #d8d2ce;border-radius:10px;padding:12px 8px;text-align:center;font-size:.9rem;font-weight:600;background:#fff;color:#37322f;cursor:pointer;transition:all .15s}
 .shift-toggle.active{border-color:#0f6e56;background:#dcefe2;color:#0f6e56}
+.shift-toggle.kenmu-minami{color:#b22222}
+.shift-toggle.kenmu-minami.active{border-color:#b22222;background:#fdeaea;color:#b22222}
 .dial-wrap{margin-top:4px}
 .dial-wrap.dials-hidden .dial-wheels{display:none}
 .dial-wrap.dials-locked .dial-row,.dial-wrap.dials-locked .dial-col,.dial-wrap.dials-locked .wheel-outer{touch-action:pan-y}
@@ -351,7 +353,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.19';
+const APP_VERSION = '1.2.20';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -567,6 +569,22 @@ function recordKey(date, staffId) {
 
 function hasMinamiKenmuWorkType(workType) {
   return String(workType || '').includes('兼務-minami');
+}
+
+function isMinamiKenmuExtraShift(shift) {
+  return !!(
+    staff &&
+    hasMinamiKenmuWorkType(staff.workType) &&
+    staff.facilityId !== 'minami' &&
+    shift.facilityId === 'minami'
+  );
+}
+
+function shiftToggleLabel(shift) {
+  if (!isMinamiKenmuExtraShift(shift)) return shift.label;
+  if (shift.shiftKey === 'minami_chori_a') return '南調理A';
+  if (shift.shiftKey === 'minami_chori_b') return '南調理B';
+  return shift.label;
 }
 
 function shiftKeysForStaff(staffRef) {
@@ -959,8 +977,9 @@ function buildToggles() {
   SHIFTS.forEach((shift, i) => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'shift-toggle' + (i === selShiftIdx ? ' active' : '');
-    btn.textContent = shift.label;
+    const kenmuMinami = isMinamiKenmuExtraShift(shift);
+    btn.className = 'shift-toggle' + (i === selShiftIdx ? ' active' : '') + (kenmuMinami ? ' kenmu-minami' : '');
+    btn.textContent = shiftToggleLabel(shift);
     btn.addEventListener('click', () => selShift(i));
     container.appendChild(btn);
   });
