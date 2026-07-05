@@ -45,6 +45,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku
 .overtime-reason-panel,.late-reason-panel{margin-top:8px;padding-top:8px;border-top:1px solid #ece8e5}
 .overtime-reason-panel .section-label,.late-reason-panel .section-label{margin-bottom:8px}
 .hol-row{margin-top:10px}
+.hol-reason-panel{margin-top:10px;padding-top:10px;border-top:1px solid #ece8e5}
+.hol-reason-panel .section-label{color:#854f0b;margin-bottom:8px}
 .dial-row{display:flex;align-items:center;justify-content:center;gap:4px}
 .dial-col{flex:1;max-width:72px}
 .dial-label{text-align:center;font-size:.7rem;color:#6b6562;margin-bottom:4px}
@@ -180,6 +182,10 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
     <div class="shift-toggles" id="shiftToggles"></div>
     <div class="chip-row hol-row">
       <button type="button" class="chip" id="chipHol" data-key="hol">休日出勤</button>
+    </div>
+    <div id="holidayReasonPanel" class="reason-block hol-reason-panel" style="display:none">
+      <div class="section-label">休日出勤の理由（必須）</div>
+      <input type="text" id="holidayWorkNote" placeholder="理由（必須）" maxlength="200">
     </div>
 
     <div class="dial-wrap dials-locked dials-hidden" id="dialWrap">
@@ -353,7 +359,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.22';
+const APP_VERSION = '1.2.23';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -595,6 +601,46 @@ function shiftToggleLabel(shift) {
 }
 
 const MINAMI_KENMU_MEMO = '南勤務';
+const HOLIDAY_MEMO_PREFIX = '休出：';
+
+function parseHolidayMemo(fullMemo) {
+  const text = String(fullMemo || '').trim();
+  if (!text.startsWith(HOLIDAY_MEMO_PREFIX)) {
+    return { holidayWorkNote: '', freeMemo: text };
+  }
+  const nl = text.indexOf('\n');
+  if (nl === -1) {
+    return {
+      holidayWorkNote: text.slice(HOLIDAY_MEMO_PREFIX.length).trim(),
+      freeMemo: ''
+    };
+  }
+  return {
+    holidayWorkNote: text.slice(HOLIDAY_MEMO_PREFIX.length, nl).trim(),
+    freeMemo: text.slice(nl + 1).trim()
+  };
+}
+
+function buildMemoForSave() {
+  const free = memo.trim();
+  if (holidayWorkFlag && status === 'work') {
+    const reason = holidayWorkNote.trim();
+    const holPart = `${HOLIDAY_MEMO_PREFIX}${reason}`;
+    return free ? `${holPart}\n${free}` : holPart;
+  }
+  return free;
+}
+
+function clearHolidayWorkPanels() {
+  lateKind = null;
+  lateNote = '';
+  latePanelVisible = false;
+  overtimeReason = null;
+  overtimeNote = '';
+  overtimePanelVisible = false;
+  if ($('lateNote')) $('lateNote').value = '';
+  if ($('overtimeNote')) $('overtimeNote').value = '';
+}
 
 function syncMinamiKenmuMemo() {
   if (!staff || !SHIFTS.length || status !== 'work') return;
@@ -701,6 +747,7 @@ let status = 'work';
 let lateKind = null;
 let lateNote = '';
 let holidayWorkFlag = false;
+let holidayWorkNote = '';
 let absenceReason = null;
 let absenceNote = '';
 let overtimeReason = null;
@@ -1032,7 +1079,15 @@ function selShift(i) {
 }
 
 function tog(key) {
-  if (key === 'hol') holidayWorkFlag = !holidayWorkFlag;
+  if (key === 'hol') {
+    holidayWorkFlag = !holidayWorkFlag;
+    if (holidayWorkFlag) {
+      clearHolidayWorkPanels();
+    } else {
+      holidayWorkNote = '';
+      if ($('holidayWorkNote')) $('holidayWorkNote').value = '';
+    }
+  }
   render();
 }
 
@@ -1058,7 +1113,7 @@ function setOtReason(r) {
 }
 
 function syncOvertimeReasonState(ot) {
-  if (status !== 'work' || ot < OVERTIME_THRESHOLD_MIN) {
+  if (holidayWorkFlag || status !== 'work' || ot < OVERTIME_THRESHOLD_MIN) {
     overtimeReason = null;
     overtimeNote = '';
     overtimePanelVisible = false;
@@ -1090,7 +1145,7 @@ function syncLateReasonState(short) {
 }
 
 function needsLateReason(short) {
-  return status === 'work' && short && !isTokuteiLateExempt();
+  return status === 'work' && short && !isTokuteiLateExempt() && !holidayWorkFlag;
 }
 
 function shouldShowLatePanel(short) {
@@ -1098,7 +1153,7 @@ function shouldShowLatePanel(short) {
 }
 
 function needsOvertimeReason(ot) {
-  return status === 'work' && ot >= OVERTIME_THRESHOLD_MIN;
+  return status === 'work' && ot >= OVERTIME_THRESHOLD_MIN && !holidayWorkFlag;
 }
 
 function setAbs(r) {
@@ -1132,6 +1187,12 @@ function getValidation() {
     }
     if (overtimeReason === 'other' && isEmpty(overtimeNote)) {
       return { ok: false, msg: '「その他」の残業理由を入力してください。' };
+    }
+  }
+  if (holidayWorkFlag && status === 'work') {
+    holidayWorkNote = $('holidayWorkNote') ? $('holidayWorkNote').value : holidayWorkNote;
+    if (isEmpty(holidayWorkNote)) {
+      return { ok: false, msg: '休日出勤の理由を入力してください。' };
     }
   }
   if (status === 'absence' && !absenceReason) {
@@ -1180,13 +1241,22 @@ function render() {
   } else {
     banner.classList.add(holidayWorkFlag ? 'holiday' : 'work');
     bannerMain.textContent = `実働 ${fmtHours(work)}`;
-    bannerSub.textContent = `残業 ${fmtHours(ot)}`;
+    if (holidayWorkFlag) {
+      bannerSub.style.display = 'none';
+    } else {
+      bannerSub.style.display = '';
+      bannerSub.textContent = `残業 ${fmtHours(ot)}`;
+    }
   }
 
   $('workArea').classList.toggle('dimmed', status !== 'work');
 
   $('chipHol').classList.toggle('active', holidayWorkFlag);
   $('chipHol').classList.toggle('hol', holidayWorkFlag);
+
+  const showHolReason = holidayWorkFlag && status === 'work';
+  $('holidayReasonPanel').style.display = showHolReason ? 'block' : 'none';
+  if ($('holidayWorkNote')) $('holidayWorkNote').value = holidayWorkNote;
 
   const showLatePanel = shouldShowLatePanel(short);
   $('lateReasonPanel').style.display = showLatePanel ? 'block' : 'none';
@@ -1263,11 +1333,18 @@ function applyRecord(rec) {
   lateKind = rec.lateKind || (rec.lateFlag ? 'late' : null);
   lateNote = rec.lateNote || '';
   holidayWorkFlag = !!rec.holidayWorkFlag;
+  if (holidayWorkFlag) {
+    const parsed = parseHolidayMemo(rec.memo);
+    holidayWorkNote = parsed.holidayWorkNote;
+    memo = parsed.freeMemo;
+  } else {
+    holidayWorkNote = '';
+    memo = rec.memo || '';
+  }
   absenceReason = rec.absenceReason || null;
   absenceNote = rec.absenceNote || '';
   overtimeReason = rec.overtimeReason || null;
   overtimeNote = rec.overtimeNote || '';
-  memo = rec.memo || '';
 
   if (rec.shiftKey) {
     const idx = SHIFTS.findIndex(s => s.shiftKey === rec.shiftKey);
@@ -1280,6 +1357,7 @@ function applyRecord(rec) {
   $('lateNote').value = lateNote;
   $('absenceNote').value = absenceNote;
   $('overtimeNote').value = overtimeNote;
+  $('holidayWorkNote').value = holidayWorkNote;
   $('memo').value = memo;
 
   buildToggles();
@@ -1291,6 +1369,7 @@ function applyRecord(rec) {
     const short = isShortWork(work, shift ? shift.workMin : 0);
     overtimePanelVisible = needsOvertimeReason(ot);
     latePanelVisible = needsLateReason(short);
+    if (holidayWorkFlag) clearHolidayWorkPanels();
   } else {
     overtimePanelVisible = false;
     latePanelVisible = false;
@@ -1309,6 +1388,7 @@ function applyDraft(d) {
   lateKind = d.lateKind || (d.lateFlag ? 'late' : null);
   lateNote = d.lateNote || '';
   holidayWorkFlag = !!d.holidayWorkFlag;
+  holidayWorkNote = d.holidayWorkNote || '';
   absenceReason = d.absenceReason || null;
   absenceNote = d.absenceNote || '';
   overtimeReason = d.overtimeReason || null;
@@ -1317,6 +1397,7 @@ function applyDraft(d) {
   $('lateNote').value = lateNote;
   $('absenceNote').value = absenceNote;
   $('overtimeNote').value = overtimeNote;
+  $('holidayWorkNote').value = holidayWorkNote;
   $('memo').value = memo;
   buildToggles();
   hideDials();
@@ -1327,6 +1408,7 @@ function applyDraft(d) {
     const short = isShortWork(work, shift ? shift.workMin : 0);
     overtimePanelVisible = needsOvertimeReason(ot) && !!overtimeReason;
     latePanelVisible = needsLateReason(short) && !!lateKind;
+    if (holidayWorkFlag) clearHolidayWorkPanels();
   } else {
     overtimePanelVisible = false;
     latePanelVisible = false;
@@ -1342,6 +1424,7 @@ function resetForm() {
   lateKind = null;
   lateNote = '';
   holidayWorkFlag = false;
+  holidayWorkNote = '';
   absenceReason = null;
   absenceNote = '';
   overtimeReason = null;
@@ -1352,6 +1435,7 @@ function resetForm() {
   $('lateNote').value = '';
   $('absenceNote').value = '';
   $('overtimeNote').value = '';
+  $('holidayWorkNote').value = '';
   $('memo').value = '';
 
   if (!SHIFTS.length) return;
@@ -1374,6 +1458,7 @@ function buildRecord() {
   const shift = SHIFTS[selShiftIdx];
   const { work, ot } = calc();
   const now = new Date().toISOString();
+  const isHolWork = status === 'work' && holidayWorkFlag;
 
   return {
     date: currentDate,
@@ -1384,16 +1469,16 @@ function buildRecord() {
     end: endMin,
     breakMin,
     workMin: status === 'work' ? work : 0,
-    overtimeMin: status === 'work' ? ot : 0,
-    lateFlag: !!lateKind,
-    lateKind: lateKind || null,
-    lateNote: lateKind ? lateNote.trim() : '',
-    holidayWorkFlag,
+    overtimeMin: status === 'work' && !isHolWork ? ot : 0,
+    lateFlag: status === 'work' && !isHolWork && !!lateKind,
+    lateKind: isHolWork ? null : (lateKind || null),
+    lateNote: isHolWork ? '' : (lateKind ? lateNote.trim() : ''),
+    holidayWorkFlag: isHolWork,
     absenceReason: status === 'absence' ? absenceReason : null,
     absenceNote: absenceNote.trim(),
     overtimeReason: shouldShowOvertimePanel(ot) ? overtimeReason : null,
     overtimeNote: shouldShowOvertimePanel(ot) && overtimeReason === 'other' ? overtimeNote.trim() : '',
-    memo: memo.trim(),
+    memo: buildMemoForSave(),
     approvalStatus: computeApprovalStatus(currentDate, status, loadedRecord),
     createdBy: staff.staffId,
     createdAt: (loadedRecord && loadedRecord.createdAt) || now,
@@ -1411,11 +1496,12 @@ function saveDraft() {
   lateNote = $('lateNote').value;
   absenceNote = $('absenceNote').value;
   overtimeNote = $('overtimeNote').value;
+  holidayWorkNote = $('holidayWorkNote') ? $('holidayWorkNote').value : holidayWorkNote;
   memo = $('memo').value;
   try {
     localStorage.setItem(draftKey(), JSON.stringify({
       status, selShiftIdx, startMin, endMin, breakMin,
-      lateKind, lateNote, holidayWorkFlag,
+      lateKind, lateNote, holidayWorkFlag, holidayWorkNote,
       absenceReason, absenceNote, overtimeReason, overtimeNote, memo
     }));
   } catch (_) { /* ignore */ }
@@ -1654,6 +1740,7 @@ async function submitRecord() {
   lateNote = $('lateNote').value;
   absenceNote = $('absenceNote').value;
   overtimeNote = $('overtimeNote').value;
+  holidayWorkNote = $('holidayWorkNote') ? $('holidayWorkNote').value : holidayWorkNote;
   memo = $('memo').value;
 
   const val = getValidation();
@@ -2049,6 +2136,7 @@ function bootApp(staffDef, displayName) {
   $('lateNote').addEventListener('input', () => { lateNote = $('lateNote').value; render(); });
   $('absenceNote').addEventListener('input', () => { absenceNote = $('absenceNote').value; render(); });
   $('overtimeNote').addEventListener('input', () => { overtimeNote = $('overtimeNote').value; render(); });
+  $('holidayWorkNote').addEventListener('input', () => { holidayWorkNote = $('holidayWorkNote').value; render(); });
   $('memo').addEventListener('input', () => { memo = $('memo').value; render(); });
   $('btnSubmit').addEventListener('click', submitRecord);
   $('btnWithdraw').addEventListener('click', withdrawPaidLeave);
