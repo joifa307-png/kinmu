@@ -185,7 +185,16 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
     </div>
     <div id="holidayReasonPanel" class="reason-block hol-reason-panel" style="display:none">
       <div class="section-label">休日出勤の理由（必須）</div>
-      <input type="text" id="holidayWorkNote" placeholder="理由（必須）" maxlength="200">
+      <div class="chip-row" id="holidayReasonRow">
+        <button type="button" class="chip" data-reason="care">利用者の急変対応</button>
+        <button type="button" class="chip" data-reason="records">記録・書類作成</button>
+        <button type="button" class="chip" data-reason="meeting">会議・研修</button>
+        <button type="button" class="chip" data-reason="shortage">人員不足・業務集中</button>
+        <button type="button" class="chip" data-reason="other">その他</button>
+      </div>
+      <div class="reason-block" id="holidayNoteBlock" style="display:none">
+        <input type="text" id="holidayWorkNote" placeholder="休日出勤理由（その他の場合は必須）" maxlength="200">
+      </div>
     </div>
 
     <div class="dial-wrap dials-locked dials-hidden" id="dialWrap">
@@ -359,7 +368,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.23';
+const APP_VERSION = '1.2.24';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -602,6 +611,32 @@ function shiftToggleLabel(shift) {
 
 const MINAMI_KENMU_MEMO = '南勤務';
 const HOLIDAY_MEMO_PREFIX = '休出：';
+const HOLIDAY_REASON_LABELS = {
+  care: '利用者の急変対応',
+  records: '記録・書類作成',
+  meeting: '会議・研修',
+  shortage: '人員不足・業務集中'
+};
+const HOLIDAY_REASON_LEGACY = { '利用者対応': 'care' };
+
+function holidayReasonTextForSave() {
+  if (holidayWorkReason === 'other') return holidayWorkNote.trim();
+  return HOLIDAY_REASON_LABELS[holidayWorkReason] || '';
+}
+
+function parseHolidayReasonFromNote(noteText) {
+  const text = String(noteText || '').trim();
+  if (!text) return { holidayWorkReason: null, holidayWorkNote: '' };
+  if (HOLIDAY_REASON_LEGACY[text]) {
+    return { holidayWorkReason: HOLIDAY_REASON_LEGACY[text], holidayWorkNote: '' };
+  }
+  for (const [code, label] of Object.entries(HOLIDAY_REASON_LABELS)) {
+    if (text === label) {
+      return { holidayWorkReason: code, holidayWorkNote: '' };
+    }
+  }
+  return { holidayWorkReason: 'other', holidayWorkNote: text };
+}
 
 function parseHolidayMemo(fullMemo) {
   const text = String(fullMemo || '').trim();
@@ -624,7 +659,7 @@ function parseHolidayMemo(fullMemo) {
 function buildMemoForSave() {
   const free = memo.trim();
   if (holidayWorkFlag && status === 'work') {
-    const reason = holidayWorkNote.trim();
+    const reason = holidayReasonTextForSave();
     const holPart = `${HOLIDAY_MEMO_PREFIX}${reason}`;
     return free ? `${holPart}\n${free}` : holPart;
   }
@@ -747,6 +782,7 @@ let status = 'work';
 let lateKind = null;
 let lateNote = '';
 let holidayWorkFlag = false;
+let holidayWorkReason = null;
 let holidayWorkNote = '';
 let absenceReason = null;
 let absenceNote = '';
@@ -1084,10 +1120,17 @@ function tog(key) {
     if (holidayWorkFlag) {
       clearHolidayWorkPanels();
     } else {
+      holidayWorkReason = null;
       holidayWorkNote = '';
       if ($('holidayWorkNote')) $('holidayWorkNote').value = '';
     }
   }
+  render();
+}
+
+function setHolReason(r) {
+  holidayWorkReason = r;
+  if (r !== 'other') holidayWorkNote = '';
   render();
 }
 
@@ -1190,9 +1233,11 @@ function getValidation() {
     }
   }
   if (holidayWorkFlag && status === 'work') {
-    holidayWorkNote = $('holidayWorkNote') ? $('holidayWorkNote').value : holidayWorkNote;
-    if (isEmpty(holidayWorkNote)) {
-      return { ok: false, msg: '休日出勤の理由を入力してください。' };
+    if (!holidayWorkReason) {
+      return { ok: false, msg: '休日出勤の理由を選んでください。' };
+    }
+    if (holidayWorkReason === 'other' && isEmpty(holidayWorkNote)) {
+      return { ok: false, msg: '「その他」の休日出勤理由を入力してください。' };
     }
   }
   if (status === 'absence' && !absenceReason) {
@@ -1256,6 +1301,12 @@ function render() {
 
   const showHolReason = holidayWorkFlag && status === 'work';
   $('holidayReasonPanel').style.display = showHolReason ? 'block' : 'none';
+  document.querySelectorAll('#holidayReasonRow .chip').forEach(btn => {
+    const r = btn.dataset.reason;
+    btn.classList.toggle('active', holidayWorkReason === r);
+    btn.classList.toggle('hol', holidayWorkReason === r);
+  });
+  $('holidayNoteBlock').style.display = showHolReason && holidayWorkReason === 'other' ? 'block' : 'none';
   if ($('holidayWorkNote')) $('holidayWorkNote').value = holidayWorkNote;
 
   const showLatePanel = shouldShowLatePanel(short);
@@ -1335,9 +1386,12 @@ function applyRecord(rec) {
   holidayWorkFlag = !!rec.holidayWorkFlag;
   if (holidayWorkFlag) {
     const parsed = parseHolidayMemo(rec.memo);
-    holidayWorkNote = parsed.holidayWorkNote;
+    const reasonParsed = parseHolidayReasonFromNote(parsed.holidayWorkNote);
+    holidayWorkReason = reasonParsed.holidayWorkReason;
+    holidayWorkNote = reasonParsed.holidayWorkNote;
     memo = parsed.freeMemo;
   } else {
+    holidayWorkReason = null;
     holidayWorkNote = '';
     memo = rec.memo || '';
   }
@@ -1388,6 +1442,7 @@ function applyDraft(d) {
   lateKind = d.lateKind || (d.lateFlag ? 'late' : null);
   lateNote = d.lateNote || '';
   holidayWorkFlag = !!d.holidayWorkFlag;
+  holidayWorkReason = d.holidayWorkReason || null;
   holidayWorkNote = d.holidayWorkNote || '';
   absenceReason = d.absenceReason || null;
   absenceNote = d.absenceNote || '';
@@ -1424,6 +1479,7 @@ function resetForm() {
   lateKind = null;
   lateNote = '';
   holidayWorkFlag = false;
+  holidayWorkReason = null;
   holidayWorkNote = '';
   absenceReason = null;
   absenceNote = '';
@@ -1501,7 +1557,7 @@ function saveDraft() {
   try {
     localStorage.setItem(draftKey(), JSON.stringify({
       status, selShiftIdx, startMin, endMin, breakMin,
-      lateKind, lateNote, holidayWorkFlag, holidayWorkNote,
+      lateKind, lateNote, holidayWorkFlag, holidayWorkReason, holidayWorkNote,
       absenceReason, absenceNote, overtimeReason, overtimeNote, memo
     }));
   } catch (_) { /* ignore */ }
@@ -2129,6 +2185,10 @@ function bootApp(staffDef, displayName) {
   $('overtimeReasonRow').addEventListener('click', e => {
     const btn = e.target.closest('[data-reason]');
     if (btn) setOtReason(btn.dataset.reason);
+  });
+  $('holidayReasonRow').addEventListener('click', e => {
+    const btn = e.target.closest('[data-reason]');
+    if (btn) setHolReason(btn.dataset.reason);
   });
   document.querySelectorAll('#segRow .seg').forEach(btn => {
     btn.addEventListener('click', () => setMode(btn.dataset.mode));
