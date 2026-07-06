@@ -368,7 +368,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.24';
+const APP_VERSION = '1.2.25';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -618,6 +618,33 @@ const HOLIDAY_REASON_LABELS = {
   shortage: '人員不足・業務集中'
 };
 const HOLIDAY_REASON_LEGACY = { '利用者対応': 'care' };
+const HONBU_CORRECTION_RE = /^【本部訂正\s+\d{4}-\d{2}-\d{2}】/;
+
+function splitHonbuCorrectionMemo(fullMemo) {
+  const text = String(fullMemo || '');
+  const match = text.match(HONBU_CORRECTION_RE);
+  if (!match) return { stamp: '', body: text };
+  const stamp = match[0];
+  let body = text.slice(stamp.length);
+  if (body.startsWith('\r\n')) body = body.slice(2);
+  else if (body.startsWith('\n')) body = body.slice(1);
+  return { stamp, body };
+}
+
+function loadMemoFromRecord(rawMemo, isHoliday) {
+  const { stamp, body } = splitHonbuCorrectionMemo(rawMemo);
+  honbuMemoStamp = stamp;
+  if (isHoliday) {
+    const parsed = parseHolidayMemo(body);
+    const reasonParsed = parseHolidayReasonFromNote(parsed.holidayWorkNote);
+    return {
+      holidayWorkReason: reasonParsed.holidayWorkReason,
+      holidayWorkNote: reasonParsed.holidayWorkNote,
+      memo: parsed.freeMemo
+    };
+  }
+  return { holidayWorkReason: null, holidayWorkNote: '', memo: body };
+}
 
 function holidayReasonTextForSave() {
   if (holidayWorkReason === 'other') return holidayWorkNote.trim();
@@ -657,13 +684,16 @@ function parseHolidayMemo(fullMemo) {
 }
 
 function buildMemoForSave() {
-  const free = memo.trim();
+  let body = memo.trim();
   if (holidayWorkFlag && status === 'work') {
     const reason = holidayReasonTextForSave();
     const holPart = `${HOLIDAY_MEMO_PREFIX}${reason}`;
-    return free ? `${holPart}\n${free}` : holPart;
+    body = body ? `${holPart}\n${body}` : holPart;
   }
-  return free;
+  if (honbuMemoStamp) {
+    return body ? `${honbuMemoStamp}${body}` : honbuMemoStamp;
+  }
+  return body;
 }
 
 function clearHolidayWorkPanels() {
@@ -789,6 +819,7 @@ let absenceNote = '';
 let overtimeReason = null;
 let overtimeNote = '';
 let memo = '';
+let honbuMemoStamp = '';
 let wheelsMounted = false;
 let saving = false;
 let withdrawing = false;
@@ -1384,17 +1415,10 @@ function applyRecord(rec) {
   lateKind = rec.lateKind || (rec.lateFlag ? 'late' : null);
   lateNote = rec.lateNote || '';
   holidayWorkFlag = !!rec.holidayWorkFlag;
-  if (holidayWorkFlag) {
-    const parsed = parseHolidayMemo(rec.memo);
-    const reasonParsed = parseHolidayReasonFromNote(parsed.holidayWorkNote);
-    holidayWorkReason = reasonParsed.holidayWorkReason;
-    holidayWorkNote = reasonParsed.holidayWorkNote;
-    memo = parsed.freeMemo;
-  } else {
-    holidayWorkReason = null;
-    holidayWorkNote = '';
-    memo = rec.memo || '';
-  }
+  const memoLoad = loadMemoFromRecord(rec.memo, holidayWorkFlag);
+  holidayWorkReason = memoLoad.holidayWorkReason;
+  holidayWorkNote = memoLoad.holidayWorkNote;
+  memo = memoLoad.memo;
   absenceReason = rec.absenceReason || null;
   absenceNote = rec.absenceNote || '';
   overtimeReason = rec.overtimeReason || null;
@@ -1444,11 +1468,19 @@ function applyDraft(d) {
   holidayWorkFlag = !!d.holidayWorkFlag;
   holidayWorkReason = d.holidayWorkReason || null;
   holidayWorkNote = d.holidayWorkNote || '';
+  honbuMemoStamp = d.honbuMemoStamp || '';
   absenceReason = d.absenceReason || null;
   absenceNote = d.absenceNote || '';
   overtimeReason = d.overtimeReason || null;
   overtimeNote = d.overtimeNote || '';
   memo = d.memo || '';
+  if (!honbuMemoStamp && memo) {
+    const split = splitHonbuCorrectionMemo(memo);
+    if (split.stamp) {
+      honbuMemoStamp = split.stamp;
+      memo = split.body;
+    }
+  }
   $('lateNote').value = lateNote;
   $('absenceNote').value = absenceNote;
   $('overtimeNote').value = overtimeNote;
@@ -1488,6 +1520,7 @@ function resetForm() {
   overtimePanelVisible = false;
   latePanelVisible = false;
   memo = '';
+  honbuMemoStamp = '';
   $('lateNote').value = '';
   $('absenceNote').value = '';
   $('overtimeNote').value = '';
@@ -1558,7 +1591,7 @@ function saveDraft() {
     localStorage.setItem(draftKey(), JSON.stringify({
       status, selShiftIdx, startMin, endMin, breakMin,
       lateKind, lateNote, holidayWorkFlag, holidayWorkReason, holidayWorkNote,
-      absenceReason, absenceNote, overtimeReason, overtimeNote, memo
+      absenceReason, absenceNote, overtimeReason, overtimeNote, memo, honbuMemoStamp
     }));
   } catch (_) { /* ignore */ }
 }
