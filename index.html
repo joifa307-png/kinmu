@@ -47,6 +47,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku
 .hol-row{margin-top:10px}
 .hol-reason-panel{margin-top:10px;padding-top:10px;border-top:1px solid #ece8e5}
 .hol-reason-panel .section-label{color:#854f0b;margin-bottom:8px}
+.break-chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.chip.active.break{border-color:#0f6e56;background:#dcefe2;color:#0f6e56}
 .dial-row{display:flex;align-items:center;justify-content:center;gap:4px}
 .dial-col{flex:1;max-width:72px}
 .dial-label{text-align:center;font-size:.7rem;color:#6b6562;margin-bottom:4px}
@@ -201,6 +203,11 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
       <div class="dial-header">
         <span class="range" id="dialRange"></span>
         <button type="button" id="btnDialEdit" class="btn-dial-edit">変更</button>
+      </div>
+      <div class="break-chip-row" id="breakChipRow" style="display:none">
+        <button type="button" class="chip" data-break="none">休憩なし</button>
+        <button type="button" class="chip" data-break="30">30分</button>
+        <button type="button" class="chip" data-break="default" id="breakChipDefault">既定</button>
       </div>
       <div class="dial-wheels" id="dialWheels">
       <div class="dial-row">
@@ -368,7 +375,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.25';
+const APP_VERSION = '1.2.26';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -1130,6 +1137,60 @@ function buildToggles() {
   });
 }
 
+function isYakinShift(shift) {
+  return !!(shift && String(shift.shiftKey || '').includes('yakin'));
+}
+
+function currentShiftDefaultBreak() {
+  const shift = SHIFTS[selShiftIdx];
+  return shift ? Number(shift.breakMin) || 0 : 0;
+}
+
+function selectedBreakChipKey() {
+  const def = currentShiftDefaultBreak();
+  if (breakMin === def) return 'default';
+  if (breakMin === 0) return 'none';
+  if (breakMin === 30) return '30';
+  return null;
+}
+
+function setBreakByChip(key) {
+  const shift = SHIFTS[selShiftIdx];
+  if (!shift || isYakinShift(shift) || status !== 'work') return;
+  if (key === 'none') breakMin = 0;
+  else if (key === '30') breakMin = 30;
+  else breakMin = currentShiftDefaultBreak();
+
+  if (dialsLocked) {
+    const { ot, short } = calc();
+    overtimePanelVisible = needsOvertimeReason(ot);
+    if (!overtimePanelVisible) syncOvertimeReasonState(ot);
+    latePanelVisible = needsLateReason(short);
+    if (!latePanelVisible) syncLateReasonState(short);
+  }
+  render();
+}
+
+function updateBreakChipsUI() {
+  const row = $('breakChipRow');
+  if (!row) return;
+  const shift = SHIFTS[selShiftIdx];
+  const show = status === 'work' && shift && !isYakinShift(shift);
+  row.style.display = show ? 'flex' : 'none';
+  if (!show) return;
+
+  const defMin = currentShiftDefaultBreak();
+  const defBtn = $('breakChipDefault');
+  if (defBtn) defBtn.textContent = `既定(${defMin}分)`;
+
+  const selected = selectedBreakChipKey();
+  row.querySelectorAll('.chip[data-break]').forEach(btn => {
+    const on = btn.dataset.break === selected;
+    btn.classList.toggle('active', on);
+    btn.classList.toggle('break', on);
+  });
+}
+
 function selShift(i) {
   selShiftIdx = i;
   const shift = SHIFTS[i];
@@ -1290,6 +1351,7 @@ function render() {
   const val = getValidation();
 
   $('dialRange').textContent = `${fmtTime(startMin)} 〜 ${fmtTime(endMin)}`;
+  updateBreakChipsUI();
 
   const banner = $('banner');
   const bannerMain = $('bannerMain');
@@ -2209,6 +2271,10 @@ function bootApp(staffDef, displayName) {
   initCalendar();
   initHistory();
   $('chipHol').addEventListener('click', () => tog('hol'));
+  $('breakChipRow').addEventListener('click', e => {
+    const btn = e.target.closest('[data-break]');
+    if (btn) setBreakByChip(btn.dataset.break);
+  });
   $('lateKindRow').addEventListener('click', e => {
     const btn = e.target.closest('[data-kind]');
     if (btn) setLateKind(btn.dataset.kind);
