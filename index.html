@@ -375,7 +375,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.26';
+const APP_VERSION = '1.2.27';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -605,7 +605,9 @@ function isMinamiKenmuExtraShift(shift) {
     staff &&
     hasMinamiKenmuWorkType(staff.workType) &&
     staff.facilityId !== 'minami' &&
-    shift.facilityId === 'minami'
+    staff.jobType === 'chori' &&
+    shift.facilityId === 'minami' &&
+    shift.jobType === 'chori'
   );
 }
 
@@ -755,7 +757,12 @@ function shiftKeysForStaff(staffRef) {
   }
 
   addShiftsForFacility(s.facilityId);
-  if (hasMinamiKenmuWorkType(s.workType)) {
+  // 兼務は「西の調理 → 南の調理も選べる」用途のみ。介護など他職種・南所属には広げない。
+  if (
+    hasMinamiKenmuWorkType(s.workType) &&
+    s.facilityId !== 'minami' &&
+    s.jobType === 'chori'
+  ) {
     addShiftsForFacility('minami');
   }
   return keys;
