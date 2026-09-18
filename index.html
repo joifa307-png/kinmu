@@ -115,6 +115,10 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 .toast.toast-farewell{top:50%;bottom:auto;transform:translate(-50%,-50%);background:#faeeda;color:#854f0b;min-width:17em;padding:16px 36px;font-size:.92rem;line-height:1.65;word-break:keep-all}
 .toast.show{opacity:1}
 .cal-overlay{position:fixed;inset:0;background:rgba(55,50,47,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
+.close-remind-overlay{position:fixed;inset:0;background:rgba(55,50,47,.45);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px}
+.close-remind-modal{background:#fff;border-radius:14px;padding:22px 20px 18px;width:100%;max-width:340px;box-shadow:0 4px 20px rgba(55,50,47,.15);text-align:center}
+.close-remind-msg{font-size:.95rem;color:#37322f;line-height:1.7;margin-bottom:18px;text-align:left}
+.close-remind-ok{width:100%;padding:14px;border:none;border-radius:12px;background:#0f6e56;color:#fff;font-size:1rem;font-weight:700;cursor:pointer;font-family:inherit}
 .cal-modal{background:#fff;border-radius:14px;padding:16px;width:100%;max-width:340px;box-shadow:0 4px 20px rgba(55,50,47,.15)}
 .cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .cal-header button{background:none;border:none;font-size:1.4rem;color:#0f6e56;padding:4px 12px;cursor:pointer;line-height:1}
@@ -339,6 +343,13 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
   </div>
 </div>
 
+<div id="closeRemindOverlay" class="close-remind-overlay" style="display:none" aria-hidden="true">
+  <div class="close-remind-modal" role="dialog" aria-label="締め前リマインド">
+    <p class="close-remind-msg">まもなく、出勤記録の締め日です。記録忘れがないかチェックをお願いします。</p>
+    <button type="button" class="close-remind-ok" id="closeRemindOk">OK</button>
+  </div>
+</div>
+
 <!-- ===== 使い方ガイド モーダル ===== -->
 <div id="guideModal" style="display:none; position:fixed; inset:0; z-index:9999;
      background:#eae5e3; overflow:hidden; flex-direction:column;">
@@ -375,7 +386,7 @@ input[type=text]:focus{outline:2px solid #0f6e56;outline-offset:0}
 
 <script>
 /* ── 定数 ── */
-const APP_VERSION = '1.2.29';
+const APP_VERSION = '1.2.30';
 const WOFF_ID = 'I3CXzegAtaumw7nah4t8eQ';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx24znbj2ThSj41D8mFX9adq70lyhyWAanJbZ6jGS3deDbgT2JRCy_fC9c65yAMgEg/exec';
 const MINUTES = [0, 10, 20, 30, 40, 50];
@@ -2312,6 +2323,119 @@ function bootApp(staffDef, displayName) {
   $('btnDeleteRecord').addEventListener('click', deleteCurrentRecord);
   $('btnDialEdit').addEventListener('click', toggleDialEdit);
   hideDials();
+  initCloseRemindTestTap();
+  $('closeRemindOk').addEventListener('click', closeCloseRemindDialog);
+  maybeShowCloseRemind();
+}
+
+/* ── 締め前リマインド（カレンダー日付のみ・localStorage） ── */
+const CLOSE_REMIND_LS_KEY = 'kinmu_close_remind_ym';
+const CLOSE_REMIND_DAYS = [9, 10, 11];
+let closeRemindTestDay = null;
+
+function getUrlQueryParam(name) {
+  try {
+    const fromSearch = new URLSearchParams(location.search).get(name);
+    if (fromSearch != null && fromSearch !== '') return fromSearch;
+  } catch (_) { /* ignore */ }
+  try {
+    const href = location.href;
+    const qIdx = href.indexOf('?');
+    if (qIdx >= 0) {
+      const q = href.slice(qIdx + 1).split('#')[0];
+      const v = new URLSearchParams(q).get(name);
+      if (v != null && v !== '') return v;
+    }
+  } catch (_) { /* ignore */ }
+  try {
+    const hash = String(location.hash || '').replace(/^#/, '');
+    if (hash) {
+      const q = hash.startsWith('?') ? hash.slice(1) : hash;
+      const v = new URLSearchParams(q).get(name);
+      if (v != null && v !== '') return v;
+    }
+  } catch (_) { /* ignore */ }
+  return null;
+}
+
+function getCloseRemindContext() {
+  const now = new Date();
+  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  let day = now.getDate();
+  let force = false;
+
+  const q = getUrlQueryParam('testday');
+  if (q != null && q !== '') {
+    const n = parseInt(q, 10);
+    if (!isNaN(n) && n >= 1 && n <= 31) {
+      day = n;
+      force = true;
+    }
+  } else if (closeRemindTestDay != null) {
+    day = closeRemindTestDay;
+    force = true;
+  }
+
+  return { day, ym, force };
+}
+
+function shouldShowCloseRemind() {
+  const { day, ym, force } = getCloseRemindContext();
+  if (CLOSE_REMIND_DAYS.indexOf(day) < 0) return false;
+  if (force) return true;
+  try {
+    return localStorage.getItem(CLOSE_REMIND_LS_KEY) !== ym;
+  } catch (_) {
+    return true;
+  }
+}
+
+function maybeShowCloseRemind() {
+  if (!shouldShowCloseRemind()) return;
+  const el = $('closeRemindOverlay');
+  if (!el) return;
+  el.style.display = 'flex';
+  el.setAttribute('aria-hidden', 'false');
+}
+
+function closeCloseRemindDialog() {
+  const { ym, force } = getCloseRemindContext();
+  if (!force) {
+    try { localStorage.setItem(CLOSE_REMIND_LS_KEY, ym); } catch (_) { /* ignore */ }
+  }
+  const el = $('closeRemindOverlay');
+  if (el) {
+    el.style.display = 'none';
+    el.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function initCloseRemindTestTap() {
+  const ver = $('appVersion');
+  if (!ver || ver.dataset.closeRemindTapBound) return;
+  ver.dataset.closeRemindTapBound = '1';
+  let taps = 0;
+  let timer = null;
+  ver.addEventListener('click', () => {
+    taps += 1;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => { taps = 0; }, 2000);
+    if (taps < 5) return;
+    taps = 0;
+    if (timer) clearTimeout(timer);
+    const raw = window.prompt('締め前リマインドテスト：日を入力（9 / 10 / 11 / その他）', '10');
+    if (raw == null) return;
+    const n = parseInt(String(raw).trim(), 10);
+    if (isNaN(n) || n < 1 || n > 31) {
+      alert('1〜31の数字を入力してください。');
+      return;
+    }
+    closeRemindTestDay = n;
+    maybeShowCloseRemind();
+    if (!shouldShowCloseRemind()) {
+      alert('日=' + n + ' のためダイアログは出ません（対象は9・10・11日）。');
+    }
+  });
 }
 
 // =====================================================
